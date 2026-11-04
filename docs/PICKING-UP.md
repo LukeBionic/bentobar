@@ -202,7 +202,7 @@ line; an item shown as text alone has no line and is exactly as in 0.9.
 ## 0.9 (2026-10-05): six new things for the bar, and the internet permission for two of them
 Merged as pull request #17 and released as 0.9 (version code 10) from the tag `v0.9`; the next release needs a new version.
 Sent to Google Play the same day, for closed testing and production, with the new Data safety answers and a new
-declaration video (`store-submission/forms/data-safety.md` has what was declared).
+declaration video (the store kit, kept privately, has what was declared).
 Five new items and three additions to old ones: Now playing, Device batteries, Heat (and a CPU rule),
 Weather, Flight; more cities and "Plan a time" in World clock; a volume slider in the bar. Two of them
 go online (Weather: Open-Meteo; Flight: AirLabs with the user's own key), each only after its item was
@@ -231,7 +231,7 @@ set up on this install. CLAUDE.md has the rules ("Going online…") and every te
   wallpaper. The README's pictures and the store's screenshots don't show the new items yet.
 - **What the internet permission changed outside the code**, done with this release: the privacy
   policy page (googlebook.studio/privacy/bentobar, public before the build was sent), Google Play's
-  Data safety form (`store-submission/forms/data-safety.md` has what was declared and why: "No data
+  Data safety form (the store kit, kept privately, has what was declared and why: "No data
   collected" is no longer true), and a new video for the Accessibility declaration (the description
   Android shows beside the switch lost "It has no internet permission"). A later release that sends
   anything else, or to anyone else, changes all three again.
@@ -259,7 +259,7 @@ the text weight against the system clock, menus, pages, and the service switched
   hides; the 2 s check compares the spacer with its own last bounds.
 - **For Google Play:** the video in the Accessibility declaration has to show the consent screen
   (first opening › Agree › Accessibility settings › on › items in the bar); the store description in
-  `store-submission/listing` goes with the release.
+  the store kit goes with the release.
 - Not checked on a device: the calendar changes (no calendar access on the test install), the
   timer's early alarm, the look on a light wallpaper (dark status bar text), an arm64 Googlebook.
 - Still open: the window's caption bar keeps the system's color (other apps by the same author paint

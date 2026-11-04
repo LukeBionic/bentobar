@@ -21,8 +21,9 @@ workflow checks the APK and the bundle against this certificate and stops if eit
 2. Add `docs/release-notes/<version>.md`: the text of the GitHub release. Keep the shape of the
    last one (a line on what BentoBar is, Install, What's new, Verify). Put the same "What's new"
    under a new heading in `CHANGELOG.md`.
-3. Write Play's "What's new" in `store-submission/listing/en-US/release-notes.txt`: plain text,
-   500 characters at most.
+3. Write Play's "What's new" in the store kit's `release-notes.txt`: plain text, 500 characters at
+   most. The store kit (listing texts, graphics and the answers given in the Play Console's forms) is
+   kept privately, outside this repo.
 4. Commit and push.
 5. Tag that commit and push the tag:
 
@@ -34,14 +35,14 @@ git tag v<version> && git push origin v<version>
 
 `.github/workflows/release.yml` runs on every `v*` tag. It:
 
-1. checks that `docs/release-notes/<version>.md` exists, that `versionName` equals the tag, and
-   that the Play text is within 500 characters;
+1. checks that `docs/release-notes/<version>.md` exists and that `versionName` equals the tag;
 2. runs the unit tests and builds the signed APK and the signed bundle (.aab);
 3. checks both against the BentoBar certificate;
 4. publishes the GitHub release "BentoBar \<version\>" with `BentoBar.apk`, `SHA256SUMS` and the
    notes file as its text;
-5. uploads the bundle to Google Play's closed-testing track as a **draft**, with the "What's new"
-   text (`tools/play-upload.mjs`). Releases that are live or rolling out stay as they are.
+5. uploads the bundle to Google Play's closed-testing track as a **draft** (`tools/play-upload.mjs`),
+   without notes: the "What's new" text is added from the store kit when the release is sent.
+   Releases that are live or rolling out stay as they are.
 
 A draft isn't served to anyone and isn't reviewed. **Someone still presses "Send for review" in the
 Play Console**; nothing goes to review on its own.

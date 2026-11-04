@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-// Puts a signed App Bundle on Google Play as a DRAFT release (closed testing by default), with the
-// release notes from the store kit. A draft is never served or reviewed: sending it for review
-// stays a button in the Play Console. No dependencies (Node 20+); prints no secret.
+// Puts a signed App Bundle on Google Play as a DRAFT release (closed testing by default), with
+// release notes if a file is given (the store kit is kept privately, so the release workflow gives
+// none: they are added when the release is sent). A draft is never served or reviewed: sending it
+// for review stays a button in the Play Console. No dependencies (Node 20+); prints no secret.
 //
-//   node tools/play-upload.mjs <package> <app.aab> <release-notes.txt> [--name 1.2.3] [--track alpha]
+//   node tools/play-upload.mjs <package> <app.aab> [release-notes.txt] [--name 1.2.3] [--track alpha]
 //   node tools/play-upload.mjs <package> --check     only: the key works and the app is reachable
 //
 // The service-account key comes from PLAY_SERVICE_ACCOUNT_JSON (the JSON text; the release workflow
@@ -19,7 +20,7 @@ const name = opt('--name', null);
 const check = flag('--check');
 const [pkg, aab, notesFile] = args;
 const fail = (m) => { console.error(m); process.exit(1); };
-if (!pkg || (!check && (!aab || !notesFile))) fail('usage: node tools/play-upload.mjs <package> <app.aab> <release-notes.txt> [--name 1.2.3] [--track alpha] | <package> --check');
+if (!pkg || (!check && !aab)) fail('usage: node tools/play-upload.mjs <package> <app.aab> [release-notes.txt] [--name 1.2.3] [--track alpha] | <package> --check');
 
 const keyText = process.env.PLAY_SERVICE_ACCOUNT_JSON || (process.env.PLAY_SERVICE_ACCOUNT_FILE && readFileSync(process.env.PLAY_SERVICE_ACCOUNT_FILE, 'utf8'));
 if (!keyText) fail('no Play key: set PLAY_SERVICE_ACCOUNT_JSON or PLAY_SERVICE_ACCOUNT_FILE');
@@ -57,13 +58,13 @@ try {
     await call('DELETE', E);
     process.exit(0);
   }
-  const text = readFileSync(notesFile, 'utf8').trim();
-  if ([...text].length > 500) throw new Error(`${notesFile} has ${[...text].length} characters; Play allows 500`);
+  const text = notesFile && readFileSync(notesFile, 'utf8').trim();
+  if (text && [...text].length > 500) throw new Error(`${notesFile} has ${[...text].length} characters; Play allows 500`);
   const bundle = await call('POST', `${UP}/edits/${edit.id}/bundles?uploadType=media`, readFileSync(aab), 'application/octet-stream');
   console.log(`${pkg}: uploaded version code ${bundle.versionCode}`);
   // Keep what is live or rolling out; replace any earlier draft with this one.
   const kept = (before.releases ?? []).filter((r) => r.status !== 'draft');
-  const draft = { ...(name ? { name } : {}), versionCodes: [String(bundle.versionCode)], status: 'draft', releaseNotes: [{ language: 'en-US', text }] };
+  const draft = { ...(name ? { name } : {}), versionCodes: [String(bundle.versionCode)], status: 'draft', ...(text ? { releaseNotes: [{ language: 'en-US', text }] } : {}) };
   await call('PUT', `${E}/tracks/${track}`, { track, releases: [draft, ...kept] });
   const after = await call('GET', `${E}/tracks/${track}`);
   // After Google has rejected an update, Play refuses a commit that could send itself for review, a
