@@ -26,4 +26,4 @@ BentoBar goes online only for the online items you turn on in Setup: Weather and
 Made for Android laptops with Android 17. Other devices with a status bar may work, but haven't been tested. The system's own icons stay where Android puts them: BentoBar organises its items next to them.
 
 Free and open source
-BentoBar is a personal hobby project, not affiliated with or endorsed by any employer. The code is MIT-licensed: github.com/kuscher/bentobar
+BentoBar is made by Meridian11 LLC, independently of any employer. The code is MIT-licensed: github.com/Meridian11Labs/bentobar

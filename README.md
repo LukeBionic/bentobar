@@ -23,7 +23,7 @@
   <img src="https://img.shields.io/badge/developed_on-a_Googlebook-1F6F66" alt="Developed on a Googlebook">
 </p>
 
-<p align="center"><sub>A personal hobby project by Fika Labs, proudly developed on a Googlebook.
+<p align="center"><sub>Made by Meridian11 LLC, proudly developed on a Googlebook.
 Not affiliated with or endorsed by any employer (<a href="#about-this-project">more</a>).</sub></p>
 
 <p align="center">
@@ -242,16 +242,16 @@ the release key on their machine: see [docs/RELEASING.md](docs/RELEASING.md).
 
 ## About this project
 
-BentoBar is my personal hobby project, published as Fika Labs.
-It has no affiliation with my employer: my employer didn't make, sponsor, review or endorse it,
-and BentoBar doesn't endorse my employer or its products either. The views, choices and any
-mistakes here are mine alone.
+BentoBar is made and published by Meridian11 LLC.
+It has no affiliation with any employer: no employer made, sponsored, reviewed or endorsed it,
+and BentoBar doesn't endorse any employer or its products either. The views, choices and any
+mistakes here are Meridian11's alone.
 
 It was proudly developed on a Googlebook: written, built and tested on the device
 itself, in its Linux terminal and on its own Android, from the first probe of the status bar to
 this release.
 
-— Fika Labs
+— Meridian11 LLC
 
 ## License
 

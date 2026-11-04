@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7 (2026-11-03)
+
+- **From Meridian11 LLC.** BentoBar is now made and published by Meridian11 LLC as `com.meridian11.books.bentobar`,
+  a new app with its own signing key and Google Play listing. The code moved to github.com/Meridian11Labs/bentobar
+  and the privacy policy to meridian11.com/privacy/bentobar. The items and settings are 1.6's.
+
 ## 1.6 (2026-10-15)
 
 - **Clipboard and scratchpad.** Keep up to eight pinned snippets and your recent session clips one click away. Clicking a snippet copies it and, when enabled, pastes it straight into the active input field. Recent clips stay in memory only and sensitive clips (such as password manager copies) are skipped.

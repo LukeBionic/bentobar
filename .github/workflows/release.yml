@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CERT: 171fd5448f51400d13724bf34226cdbe31f08c285845a63bbfaed1c029e5f90c # the BentoBar release key
+  CERT: aa074b0748f49e21967cefc8beec099186147d0ff2fcc891c4fc7218bd90ce93 # the BentoBar release key (Meridian11 LLC)
   PLAY_NOTES: store-submission/listing/en-US/release-notes.txt
 
 jobs:
@@ -133,7 +133,7 @@ jobs:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
           if [ "$GITHUB_REF_TYPE" = tag ]; then
-            node tools/play-upload.mjs io.github.kuscher.bentobar bundle/app-release.aab "$PLAY_NOTES" --name "${GITHUB_REF_NAME#v}"
+            node tools/play-upload.mjs com.meridian11.books.bentobar bundle/app-release.aab "$PLAY_NOTES" --name "${GITHUB_REF_NAME#v}"
           else
-            node tools/play-upload.mjs io.github.kuscher.bentobar --check
+            node tools/play-upload.mjs com.meridian11.books.bentobar --check
           fi

@@ -1,0 +1,241 @@
+package com.meridian11.books.bentobar.items
+
+import com.meridian11.books.bentobar.data.Uses
+import android.Manifest
+import android.content.ContentUris
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.database.ContentObserver
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.CalendarContract
+import android.util.Log
+import com.meridian11.books.bentobar.R
+import java.time.ZoneId
+import java.util.Locale
+import java.util.concurrent.Executors
+
+/** Upcoming calendar events from the Calendar provider (needs READ_CALENDAR). Tasks synced in by task apps are left out. */
+object Calendar {
+    data class Event(
+        val eventId: Long,
+        val title: String,
+        val begin: Long,
+        val end: Long,
+        val allDay: Boolean,
+        val color: Int,
+        val location: String,
+        /** On a calendar the user can edit (contributor access or more): not holidays, birthdays or subscriptions. */
+        val editable: Boolean,
+        /**
+         * A real meeting (see [Meetings.isMeeting]): timed, on an [editable] calendar, and with a video-call
+         * [link] or at least one attendee besides the user. A flight Gmail added on its own is not one.
+         */
+        val meeting: Boolean,
+        /** A video-call link found in the location or description. */
+        val link: String?,
+    ) {
+        /** A place to get directions to: a timed event's location on an editable calendar, unless that is itself a link. */
+        val place: String? get() = location.trim().takeIf { editable && !allDay && it.isNotEmpty() && !CallLinks.hasUrl(it) }
+    }
+
+    private const val TAG = "BentoBar"
+    private lateinit var app: Context
+    private val io = Executors.newSingleThreadExecutor()
+    private val main = Handler(Looper.getMainLooper())
+    @Volatile var events: List<Event> = emptyList(); private set
+    @Volatile private var loadedAt = 0L
+    private var observing = false
+    /** A load is running; [again]: the provider changed meanwhile, so one more follows it. Main thread only. */
+    private var loading = false
+    private var again = false
+    /** Bumped by [forget]: a load started before then must not publish. */
+    private var generation = 0
+
+    fun init(context: Context) { app = context.applicationContext }
+
+    fun allowed() = ::app.isInitialized && app.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
+        Uses.on(Uses.CALENDAR)
+
+    /**
+     * Reloads at most once a minute, or right away after the provider changes. One load at a time:
+     * a sync that changes hundreds of events queues one more load, not hundreds. Main thread.
+     */
+    fun refresh(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!allowed()) { forget(); return }
+        if (!force && now - loadedAt < 60_000) return
+        loadedAt = now
+        observe()
+        if (loading) { again = true; return }
+        loading = true
+        val gen = generation
+        io.execute {
+            val loaded = load(now)
+            main.post {
+                loading = false
+                if (gen == generation && allowed()) { events = loaded; Chips.update(app) }
+                if (again) { again = false; refresh(force = true) }
+            }
+        }
+    }
+
+    /** Calendar switched off in Setup: drop what was read, and whatever a running load returns. */
+    fun forget() {
+        generation++
+        again = false
+        loadedAt = 0 // allowed again: load at once, not up to a minute later
+        if (events.isNotEmpty()) { events = emptyList(); if (::app.isInitialized) Chips.update(app) }
+    }
+
+    private fun observe() {
+        if (observing) return
+        observing = true
+        app.contentResolver.registerContentObserver(CalendarContract.Instances.CONTENT_URI, true,
+            object : ContentObserver(main) {
+                override fun onChange(selfChange: Boolean) { refresh(force = true) }
+            })
+    }
+
+    /**
+     * The days the month menu shows beyond the ones always kept loaded (36 hours back to 40 days
+     * ahead), loaded as well while it shows them. Without it, a month further out looked empty.
+     */
+    @Volatile private var view: LongRange? = null
+
+    /** The month menu shows [from] to [to]; nulls when it has closed. */
+    fun view(from: Long?, to: Long?) {
+        val next = if (from == null || to == null) null else from..to
+        if (next == view) return
+        view = next
+        if (next != null && allowed()) refresh(force = true)
+    }
+
+    private fun load(now: Long): List<Event> = try {
+        val begin = now - 36 * 3_600_000L
+        val end = now + 40 * 86_400_000L
+        val spans = Meetings.spans(begin..end, view)
+        val projection = arrayOf(
+            CalendarContract.Instances.EVENT_ID, CalendarContract.Instances.TITLE,
+            CalendarContract.Instances.BEGIN, CalendarContract.Instances.END,
+            CalendarContract.Instances.ALL_DAY, CalendarContract.Instances.DISPLAY_COLOR,
+            CalendarContract.Instances.EVENT_LOCATION, CalendarContract.Instances.DESCRIPTION,
+            CalendarContract.Instances.SELF_ATTENDEE_STATUS, CalendarContract.Instances.VISIBLE,
+            CalendarContract.Instances.CALENDAR_ACCESS_LEVEL, CalendarContract.Instances.OWNER_ACCOUNT,
+        )
+        val out = ArrayList<Event>()
+        // The calendar owner of each event, for telling the user apart from other attendees.
+        val owners = HashMap<Long, String>()
+        // An occurrence that crosses from one span into the next comes back from both.
+        val seen = HashSet<Pair<Long, Long>>()
+        for (span in spans) CalendarContract.Instances.query(app.contentResolver, projection, span.first, span.last)?.use { c ->
+            while (c.moveToNext()) {
+                if (c.getInt(9) == 0) continue // calendar hidden by the user
+                if (c.getInt(8) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
+                val location = c.getString(6).orEmpty()
+                val text = location + "\n" + c.getString(7).orEmpty()
+                // Tasks synced in from a task app (Todoist links each one, open or done) aren't events:
+                // they show nowhere, not in the agenda, the month view, Next meeting or the chip.
+                if (CallLinks.isTask(text)) continue
+                val allDay = c.getInt(4) != 0
+                val id = c.getLong(0)
+                if (!seen.add(id to c.getLong(2))) continue
+                c.getString(11)?.let { owners[id] = it }
+                out += Event(
+                    eventId = id, title = c.getString(1).orEmpty().ifBlank { app.getString(R.string.calendar_no_title) },
+                    begin = c.getLong(2), end = c.getLong(3), allDay = allDay,
+                    color = c.getInt(5), location = location,
+                    editable = c.getInt(10) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
+                    meeting = false, link = CallLinks.find(text),
+                )
+            }
+        }
+        // Without a call link, a meeting needs someone else invited. Attendees are read for every
+        // loaded candidate, once per load (not per tick): Next meeting needs today's, and the calendar
+        // leaves meetings out of its agenda on any day the month view can show.
+        val candidates = out.filter { it.link == null && !it.allDay && it.editable }.mapTo(HashSet()) { it.eventId }
+        val withOthers = runCatching { withOthers(candidates, owners) }
+            .onFailure { Log.w(TAG, "attendee query failed", it) }.getOrDefault(emptySet())
+        out.map { e ->
+            val meeting = Meetings.isMeeting(e.allDay, e.editable, e.link != null, e.eventId in withOthers)
+            if (meeting) e.copy(meeting = true) else e
+        }.sortedBy { it.begin }
+    } catch (e: Exception) {
+        Log.w(TAG, "calendar query failed", e)
+        emptyList()
+    }
+
+    /**
+     * Of [ids], the events with at least one attendee who isn't the user. The user is an attendee
+     * whose email is the event's calendar owner ([owners]), or the organizer when that's one of the
+     * user's own accounts (the owners of calendars they own).
+     */
+    private fun withOthers(ids: Set<Long>, owners: Map<Long, String>): Set<Long> {
+        if (ids.isEmpty()) return emptySet()
+        val mine = HashSet<String>()
+        app.contentResolver.query(CalendarContract.Calendars.CONTENT_URI, arrayOf(CalendarContract.Calendars.OWNER_ACCOUNT),
+            "${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ${CalendarContract.Calendars.CAL_ACCESS_OWNER}", null, null)?.use { c ->
+            while (c.moveToNext()) c.getString(0)?.let { mine += it.lowercase(Locale.ROOT) }
+        }
+        val found = HashSet<Long>()
+        app.contentResolver.query(CalendarContract.Attendees.CONTENT_URI,
+            arrayOf(CalendarContract.Attendees.EVENT_ID, CalendarContract.Attendees.ATTENDEE_EMAIL, CalendarContract.Attendees.ATTENDEE_RELATIONSHIP),
+            "${CalendarContract.Attendees.EVENT_ID} IN (${ids.joinToString(",")})", null, null)?.use { c ->
+            while (c.moveToNext()) {
+                val id = c.getLong(0)
+                if (id in found) continue
+                val email = c.getString(1).orEmpty().trim().lowercase(Locale.ROOT)
+                if (email.isEmpty()) continue // no one to tell apart (and no one to meet)
+                val isUser = email == owners[id]?.lowercase(Locale.ROOT) ||
+                    (c.getInt(2) == CalendarContract.Attendees.RELATIONSHIP_ORGANIZER && email in mine)
+                if (!isUser) found += id
+            }
+        }
+        return found
+    }
+
+    /**
+     * Meetings (see [Event.meeting]) on now or starting before the horizon ([Meetings.horizon]: 03:00
+     * tomorrow). The Next meeting item and the chip use only these.
+     */
+    fun meetings(now: Long): List<Event> {
+        if (!allowed()) return emptyList()
+        val horizon = Meetings.horizon(now, ZoneId.systemDefault())
+        return events.filter { it.meeting && Meetings.inHorizon(it.begin, it.end, now, horizon) }
+    }
+
+    /** Every loaded meeting that hasn't ended, today's and later ones: the chip plans its next change from these. */
+    fun upcomingMeetings(now: Long): List<Event> = if (!allowed()) emptyList() else events.filter { it.meeting && it.end > now }
+
+    fun current(now: Long) = meetings(now).firstOrNull { it.begin <= now }
+    fun next(now: Long) = meetings(now).firstOrNull { it.begin > now }
+
+    /** Events overlapping the local day that starts at [dayStart] (all-day events use UTC dates). */
+    fun on(dayStart: Long, dayEnd: Long, utcDayStart: Long): List<Event> = if (!allowed()) emptyList() else events.filter {
+        if (it.allDay) it.begin <= utcDayStart && it.end > utcDayStart else it.begin < dayEnd && it.end > dayStart
+    }
+
+    fun open(e: Event) = Env.launch(openIntent(e))
+
+    /** The calendar app showing this occurrence of [e]. */
+    fun openIntent(e: Event): Intent = Intent(Intent.ACTION_VIEW,
+        ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, e.eventId))
+        .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, e.begin)
+        .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, e.end)
+
+    fun openDay(millis: Long) = Env.launch(Intent(Intent.ACTION_VIEW,
+        CalendarContract.CONTENT_URI.buildUpon().appendPath("time").appendPath(millis.toString()).build()))
+
+    fun join(e: Event) = joinIntent(e)?.let { Env.launch(it) } ?: false
+
+    fun joinIntent(e: Event): Intent? = e.link?.let { Intent(Intent.ACTION_VIEW, Uri.parse(it)) }
+
+    /** Google Maps (or any map app) searching for the event's place; the Maps website if none handles geo:. */
+    fun directions(e: Event): Boolean {
+        val q = Uri.encode(e.place ?: return false)
+        return Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=$q")), quiet = true) ||
+            Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=$q")))
+    }
+}

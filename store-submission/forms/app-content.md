@@ -2,7 +2,7 @@
 
 | Declaration | Answer |
 |---|---|
-| Privacy policy | https://googlebook.studio/privacy/bentobar |
+| Privacy policy | https://meridian11.com/privacy/bentobar |
 | Ads | No, the app contains no ads |
 | App access | All functionality is available without special access (no login) |
 | Content rating | See `content-rating.md` |

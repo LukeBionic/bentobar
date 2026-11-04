@@ -1,5 +1,1 @@
-Four new items in 1.6:
-• Clipboard & scratchpad: pin up to 8 snippets and view recent session clips (in-memory only; skips sensitive password clips), with optional one-click paste into the active field.
-• External displays: monitor resolution & refresh rate (4K 60Hz), HDR status, and "Keep awake while connected".
-• Air quality & UV: US/EU AQI, PM2.5, PM10, Ozone and UV index from Open-Meteo.
-• Exchange rates: ECB currency pairs & inline converter via Frankfurter (no key needed).
+BentoBar from Meridian11 LLC. Add, hide and organize your own items in your laptop's status bar: CPU, network, memory, battery, storage, external displays, calendar, timers, world clocks, sound, now playing, clipboard snippets, weather, air quality & UV, exchange rates, US stocks and a flight tracker. Items you don't always need wait behind the ‹ button or pop out while they have something to say.
