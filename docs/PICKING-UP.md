@@ -152,7 +152,7 @@ logged. Causes that keep coming are held to a budget: after a dozen readings wit
 - **Checked**: unit tests (`ColorWatchTest`, 25: single causes, causes that meet, a screenshot on its way,
   streams of causes, and a random storm that never asks for two screenshots within 400 ms or for more than 45
   in a minute), a second reading of the branch by a reviewer whose findings are in, and an emulator with a window
-  that keeps light icons for 3 s and for 8 s after the unlock (`BarFlipActivity`, debug builds; CLAUDE.md has
+  that keeps light icons for 3 s and for 8 s after the unlock (`BarFlipActivity`, debug builds; AGENTS.md has
   the commands): 0.9 ends white, this ends dark.
 - **On a Googlebook**: with the test window in full screen (it then lies under the bar), the strip hidden,
   the bar given light icons that turn dark three seconds later with no event, and the strip shown again:
@@ -206,7 +206,7 @@ declaration video (the store kit, kept privately, has what was declared).
 Five new items and three additions to old ones: Now playing, Device batteries, Heat (and a CPU rule),
 Weather, Flight; more cities and "Plan a time" in World clock; a volume slider in the bar. Two of them
 go online (Weather: Open-Meteo; Flight: AirLabs with the user's own key), each only after its item was
-set up on this install. CLAUDE.md has the rules ("Going online…") and every test hook.
+set up on this install. AGENTS.md has the rules ("Going online…") and every test hook.
 - **How it was made**: a shared groundwork first (`net/`, `data/Online.kt`, `data/Kept.kt`,
   `items/Refresher.kt`, `Ask.kt`, `Background.kt`, `NowPlaying.kt`, `MediaAccess.kt`, the slider in the
   strip, the type life cycle, Setup's steps 7 and 8, About › Privacy), then the five parts in files of
@@ -247,7 +247,7 @@ screen (first opening, No thanks, Turn on, Agree), colors following a maximized 
 the text weight against the system clock, menus, pages, and the service switched off and on twice.
 - **Google Play's review** found the accessibility disclosure non-compliant: Setup explained the
   service but Turn on led straight to Accessibility settings. Now `ui/Disclosure.kt` asks first, with
-  Agree and No thanks (see CLAUDE.md). About › Privacy links the privacy policy.
+  Agree and No thanks (see AGENTS.md). About › Privacy links the privacy policy.
 - **Color:** `bar/BarPixels.kt` (pure, tested) reads the text and background; a window settling
   against the bar triggers a reading; an unreadable one keeps the last colors and retries.
 - **Font:** the strip names the status bar's weight (`Fonts.barWeight`).
@@ -363,7 +363,7 @@ merged in order; CHANGELOG "Unreleased" has the user-facing list. What changed, 
 - User reported: items cut off; ‹ overlapping the timer when expanded; random collapsing; asked
   for a CPU load item; asked whether memory/CPU readings reflect other apps (yes: device-wide;
   the Linux VM alone holds ~12 GB of the 31 GB; BentoBar ~26 MB).
-- Causes and fixes are in CHANGELOG 0.3 and CLAUDE.md ("Window width", "CPU load", "CPU cost").
+- Causes and fixes are in CHANGELOG 0.3 and AGENTS.md ("Window width", "CPU load", "CPU cost").
 - The user's own settings on the HP: position CENTER, chevron OFF, spacing 9, CPU item shown.
 
 ## 0.2 (2026-09-28): renamed DiscoBar, tighter bar

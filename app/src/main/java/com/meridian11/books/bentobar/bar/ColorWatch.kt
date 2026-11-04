@@ -13,7 +13,7 @@ package com.meridian11.books.bentobar.bar
  * So every cause is followed by readings spread over the time the bar may take, each of them taken
  * whatever the one before showed, and a look that still differed at the last one is read again.
  *
- * A reading is a screenshot, and screenshots must stay few (see CLAUDE.md, Play Protect). Readings are
+ * A reading is a screenshot, and screenshots must stay few (see AGENTS.md, Play Protect). Readings are
  * tied to a cause and end; none is taken on a timer. Causes that keep coming are held to a budget:
  * after [BUSY] readings within a minute a cause's first reading waits two seconds behind the last
  * one, and what follows it comes later ([LATER_MS]), where the next cause of a stream takes its
