@@ -161,9 +161,9 @@ private projects and paths into their repos, and where signing keys are backed u
   the settings window. A menu's crop is its card; its shadow is in the window "BentoBar menu shadow" below it.
   Behind the glass other windows show through, blurred: don't publish captures with private windows behind.
 - Release (`docs/RELEASING.md`): bump `versionCode` and `versionName`, add `docs/release-notes/<version>.md`
-  and Play's "What's new" (`store-submission/listing/en-US/release-notes.txt`, 500 characters at most),
-  commit, push, then `git tag v<version> && git push origin v<version>`. GitHub Actions
-  (`.github/workflows/release.yml`) builds, signs and publishes: `BentoBar.apk` + `SHA256SUMS` as the
+  and Play's "What's new" (`release-notes.txt` in the store kit, 500 characters at most; the store kit is kept
+  privately, outside this repo), commit, push, then `git tag v<version> && git push origin v<version>`. GitHub
+  Actions (`.github/workflows/release.yml`) builds, signs and publishes: `BentoBar.apk` + `SHA256SUMS` as the
   GitHub release, the bundle as a draft on Google Play's closed-testing track. Someone still presses
   "Send for review" in the Play Console. "Run workflow" on the Actions tab is a dry run.
 - The release key (alias `bentobar`, cert SHA-256 AA:07:4B:07:…:BD:90:CE:93, CN=BentoBar, O=Meridian11 LLC; made

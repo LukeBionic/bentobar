@@ -1,1 +1,0 @@
-BentoBar: Customized Statusbar
