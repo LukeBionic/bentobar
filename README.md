@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Googlebook_OS-Android_17-133F43" alt="Googlebook OS, Android 17">
-  <img src="https://img.shields.io/badge/goes_online-only_for_Weather,_Flight_and_US_stocks-2E7D32" alt="Goes online only for Weather, Flight and US stocks">
+  <img src="https://img.shields.io/badge/goes_online-only_for_five_items_you_set_up-2E7D32" alt="Goes online only for five items you set up">
   <img src="https://img.shields.io/badge/license-MIT-555555" alt="MIT license">
   <img src="https://img.shields.io/badge/developed_on-a_Googlebook-1F6F66" alt="Developed on a Googlebook">
 </p>
@@ -152,7 +152,7 @@ with that access:
 
 BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse or touches.
 
-**BentoBar goes online for three items only, and only after you set them up** on this device:
+**BentoBar goes online for five items only, and only after you set them up** on this device:
 
 - **Weather** sends [Open-Meteo](https://open-meteo.com) the city you search for, and for the forecast
   the coordinates of the city you pick, rounded to about a kilometre: about every 30 minutes while the
@@ -164,6 +164,14 @@ BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse
   Open-Meteo that location rounded to about 10 km. BentoBar asks only for Android's "while using the
   app" permission, not for background location. Where you are, and its forecast, are kept
   in memory only: never on the device, in your layout or in its backup.
+- **Air quality & UV** sends Open-Meteo what Weather does (the city you search for, then the city's
+  coordinates or, with My location, where the device is, rounded in the same way): about every 30
+  minutes while the bar is on screen, and when you open its menu or press Refresh. Its readings are
+  kept in memory only. Weather's switch in Setup › Online services covers it too.
+- **Exchange rates** asks [Frankfurter](https://frankfurter.dev) for the European Central Bank's
+  reference table of currencies, at most once an hour while the bar is on screen, and when you open
+  its menu or press Refresh. No key is needed, and the pairs you follow and the converter's amounts are
+  worked out on the device. Frankfurter sees your IP address, as any website does.
 - **Flight** sends [AirLabs](https://airlabs.co) the flight number and your own AirLabs key: when you
   track a flight, when you press Refresh, and while it follows the flight (about every 3 hours, then
   every 30 minutes or sooner from 3 hours before departure until it lands). AirLabs sees your IP
@@ -174,11 +182,17 @@ BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse
   press Search.
   Finnhub sees your IP address and can tie requests to your key's account. BentoBar ships no key.
 
-Requests can go to those three services and nowhere else (the code has no way to name another
+Requests can go to those four services and nowhere else (the code has no way to name another
 address), **Setup › Online services** switches each off, and a layout pasted from another install
-never turns them on. BentoBar sends nothing else anywhere: not your layout, your calendar, what's
-playing or anything it measures. It has no accounts of its own, no ads and no analytics, and it
+never turns them on. BentoBar sends nothing else anywhere: not your layout, your calendar, your
+clipboard, what's playing or anything it measures. It has no accounts of its own, no ads and no analytics, and it
 sends its developer nothing.
+
+**Clipboard** reads the text you copy while the item is in use, and keeps your last few copies in
+memory only: they are gone when BentoBar stops, and are never stored or sent. The snippets you pin are
+saved with the item, in your layout. With *Paste into active field on click* on, the accessibility
+service pastes the snippet you click into the text field you are typing in, without reading that field
+or its app.
 
 **Now playing** reads the title, artist and artwork your media players publish, which Android shares
 only with apps that have notification access. That access is optional, and BentoBar tells Android to

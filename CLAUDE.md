@@ -80,8 +80,7 @@ private projects and paths into their repos, and where signing keys are backed u
     "Notification access" list that Android wants for it: it asks for no notification type and is
     not bound by Android by itself (see the manifest's comment). Its pure rules are in
     `items/NowPlayingRules.kt`.
-  - `net/`: the only code that opens a connection (pure Kotlin). `Host` is an enum of the four
-    hosts BentoBar may ask; a `Request` names one of them, a path and a query, so no call takes an
+  - `net/`: the only code that opens a connection (pure Kotlin). `Host` is an enum of the hosts BentoBar may ask; a `Request` names one of them, a path and a query, so no call takes an
     address. `Http.get` refuses unless the service is switched on, an item that uses it is outside
     Off and something that shows items is on screen, and never runs on the main thread. A query can
     hold a key: a `Request` prints as host and path only, and no exception leaves `HttpTransport`.
@@ -237,9 +236,10 @@ private projects and paths into their repos, and where signing keys are backed u
   In desktop windowing, Settings opens in its own window and BentoBar's stays resumed, so onResume
   alone misses changes; and with strong skipping (Kotlin 2.x) a composable reading Android state
   inside isn't redrawn when its parameters are unchanged.
-- **Going online is three items' business, and each install's own decision.** Weather, Flight and Stocks
-  ask a service; nothing else does, and nothing the accessibility service or any other item reads can get
-  there (`net/` is the only way out, and only those three types name a service in `ItemType.online`).
+- **Going online is five items' business, and each install's own decision.** Weather, Air quality, Exchange
+  rates, Flight and Stocks ask a service; nothing else does, and nothing the accessibility service or any other
+  item reads can get there (`net/` is the only way out, and only those five types name a service in
+  `ItemType.online`).
   A service is asked only after its item was set up on this install: `data/Online.kt` records that
   outside the layout, so a pasted layout or a restored backup turns nothing on. Off (Setup › Online
   services) stops requests at once and deletes what was fetched (`ItemType.forgetFetched`).
@@ -255,8 +255,8 @@ private projects and paths into their repos, and where signing keys are backed u
   A fix is good for 35 minutes, so after a night yesterday's place is never asked about (`HereRules` and
   `HereKeeper`, pure and unit-tested; `WeatherHere` is the keeper on Android's location service).
   `ManifestTest` pins the permissions, the backup rules, cleartext off and the listener's entry;
-  `HttpTest` and `HttpTransportTest` pin the four hosts and what a request may carry; `OneWayOutTest` names
-  the files that may ask a service (`items/Weather*`, `Flight*`, `AirLabs*`, `Stocks*`, `Finnhub*`) or read a key.
+  `HttpTest` and `HttpTransportTest` pin the hosts and what a request may carry; `OneWayOutTest` names
+  the files that may ask a service (`items/Weather*`, `Air*`, `Fx*`, `Flight*`, `AirLabs*`, `Stocks*`, `Finnhub*`) or read a key.
 - **US stocks** (`StocksItem`, type "stocks", rules in `StocksRules`, requests and what is kept in `StocksLoad`, replies in
   `Finnhub`): US stocks only (Finnhub's free plan), with the user's own key; one quote request per stock,
   every 2 minutes while the market is open (`Market`: weekday hours in New York; a holiday is seen in quotes
