@@ -1,7 +1,8 @@
 # BentoBar: notes for working on the code
 
-(Called DiscoBar until 0.4.1, package `io.github.kuscher.discobar`; renamed in 0.5 with a new
-package, so it installs next to DiscoBar rather than over it. Same signing key.)
+(Published by Meridian11 LLC as `com.meridian11.books.bentobar` since 1.7, a new app with a new signing key and its
+own Play listing. Up to 1.6 it was `io.github.kuscher.bentobar`, and DiscoBar, `io.github.kuscher.discobar`, until
+0.4.1.)
 
 A Bartender-style status bar organiser for Googlebooks (Googlebook OS = Android 17 desktop). A
 plain APK: no adb grants, root or system changes in the product (the user's hard requirement).
@@ -12,7 +13,7 @@ adb names, build numbers and codenames, what else is installed or open on the ow
 private projects and paths into their repos, and where signing keys are backed up (say "backed up privately").
 
 ## Layout
-- `app/src/main/java/io/github/kuscher/bentobar/`
+- `app/src/main/java/com/meridian11/books/bentobar/`
   - `bar/BarService.kt`: the AccessibilityService plus `BarController`. It scans the status bar,
     places the strip, hides it (fullscreen, keyguard, screen off, a shade covering the bar), runs
     menus, keep awake (a flag on the strip window) and colour sampling, and has adb `debug()` hooks.
@@ -152,7 +153,7 @@ private projects and paths into their repos, and where signing keys are backed u
   followed; bare `flight` prints the question and the rows);
   `sound fixed on|off`. Each type's bare name prints what it knows (`media`, `devices`, `heat`, `flight`).
   For color tests a debug build has a window that lies under the bar and turns its icons dark or light
-  on command, with no event of any kind: `adb shell am start -n io.github.kuscher.bentobar/.util.BarFlipActivity
+  on command, with no event of any kind: `adb shell am start -n com.meridian11.books.bentobar/.util.BarFlipActivity
   --ez dark true` (now), `--ez dark false --ei after 1500` (in 1.5 s), `--ez dark true --ei unlock 3000`
   (light from screen off until 3 s after the unlock: a bar that keeps the lock screen's look),
   `--ez close true` (closes it: on a desktop the Back key doesn't). On a Googlebook it only reaches the
@@ -166,8 +167,8 @@ private projects and paths into their repos, and where signing keys are backed u
   (`.github/workflows/release.yml`) builds, signs and publishes: `BentoBar.apk` + `SHA256SUMS` as the
   GitHub release, the bundle as a draft on Google Play's closed-testing track. Someone still presses
   "Send for review" in the Play Console. "Run workflow" on the Actions tab is a dry run.
-- The release key (alias `bentobar`, cert SHA-256 17:1F:D5:44:…:29:E5:F9:0C; a new key since 2026-09-30, the one Google Play uses too, so GitHub
-  installs of 0.5 and earlier must be uninstalled once) lives in the secrets of the GitHub environment
+- The release key (alias `bentobar`, cert SHA-256 AA:07:4B:07:…:BD:90:CE:93, CN=BentoBar, O=Meridian11 LLC; made
+  2026-11-03 for 1.7, the one Google Play uses too) lives in the secrets of the GitHub environment
   `release`; you never need the key file. The keystore and its password are backed up privately,
   outside the repo.
   On a machine that has `~/.config/bentobar/keystore.jks` and `keystore.pass`, `./gradlew :app:assembleRelease`

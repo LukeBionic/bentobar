@@ -16,7 +16,7 @@
 # forwards every TCP port to Android, where any app could reach it.
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
-PKG=io.github.kuscher.bentobar
+PKG=com.meridian11.books.bentobar
 SVC="$PKG/$PKG.bar.BarService"
 APK=app/build/outputs/apk/debug/app-debug.apk
 ENVF="$HOME/.config/vscodebook/android.env"

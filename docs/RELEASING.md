@@ -9,7 +9,7 @@ A release is made by pushing a tag. GitHub Actions then builds, signs and publis
 Nobody needs the signing key on their machine for this.
 
 **Every release must be signed with the BentoBar release key** (alias `bentobar`, certificate SHA-256
-`17:1F:D5:44:8F:51:40:0D:13:72:4B:F3:42:26:CD:BE:31:F0:8C:28:58:45:A6:3B:BF:AE:D1:C0:29:E5:F9:0C`).
+`AA:07:4B:07:48:F4:9E:21:96:7C:EF:C8:BE:EC:09:91:86:14:7D:0F:F2:FC:C8:91:C4:FC:72:18:BD:90:CE:93`).
 Android only installs an update over an existing app when both are signed with the same key; a
 release signed with anything else makes everyone uninstall first (and lose their layout). The
 workflow checks the APK and the bundle against this certificate and stops if either differs.
@@ -98,7 +98,7 @@ The fallback. With the key at `~/.config/bentobar/keystore.jks` and its password
 
 ```bash
 ./gradlew :app:testDebugUnitTest :app:assembleRelease :app:bundleRelease
-apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk | grep SHA-256   # must be 171fd544…29e5f90c
+apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk | grep SHA-256   # must be aa074b07…bd90ce93
 ```
 
 The APK is `app/build/outputs/apk/release/app-release.apk` (publish it as `BentoBar.apk`, with

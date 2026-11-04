@@ -4,7 +4,7 @@ The dev VM can restart mid-task. This file is the status and the next steps; kee
 commit at every milestone.
 
 ## Where things live
-- Repo `~/bentobar`, GitHub github.com/kuscher/bentobar (public; was kuscher/discobar, which redirects).
+- Repo `~/bentobar`, GitHub github.com/Meridian11Labs/bentobar (public; was kuscher/bentobar and kuscher/discobar, which redirect).
   Releases carry `BentoBar.apk` (stable name for releases/latest/download/BentoBar.apk) + SHA256SUMS.
 - Releasing (since 2026-10-01, `docs/RELEASING.md`): push a tag `v<version>` and GitHub Actions builds,
   signs and publishes the GitHub release and puts the bundle on Google Play's closed-testing track as a
@@ -345,7 +345,7 @@ merged in order; CHANGELOG "Unreleased" has the user-facing list. What changed, 
 ## 0.5 (2026-09-29): renamed BentoBar, new icon
 - The user asked: rename DiscoBar to BentoBar, a better and more modern icon, and the GitHub repo
   and the app updated to the new brand.
-- New package `io.github.kuscher.bentobar` (the Kotlin namespace too), so it installs beside
+- New package `com.meridian11.books.bentobar` (the Kotlin namespace too), so it installs beside
   DiscoBar; migration is Copy settings / Paste settings (Look page). Same key (alias `discobar`),
   key dir moved to ~/.config/bentobar, helper `./disco` → `./bento`, cache ~/.cache/bentobar.
 - Icon (tools/logo.py): bento box from above (status bar compartment with ‹ and dots as holes,

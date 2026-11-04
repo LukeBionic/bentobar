@@ -5,15 +5,15 @@ plugins {
 }
 
 android {
-    namespace = "io.github.kuscher.bentobar"
+    namespace = "com.meridian11.books.bentobar"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "io.github.kuscher.bentobar"
+        applicationId = "com.meridian11.books.bentobar"
         minSdk = 34
         targetSdk = 37
-        versionCode = 19
-        versionName = "1.6"
+        versionCode = 20
+        versionName = "1.7"
     }
 
     // Release signing from ~/.config/bentobar (never committed). Absent -> unsigned release build.

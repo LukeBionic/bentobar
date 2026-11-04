@@ -6,13 +6,13 @@
 | Default language | English (United States), en-US |
 | App or game | App |
 | Free or paid | Free |
-| Package name | `io.github.kuscher.bentobar` (Play app id 4972860541590198696) |
+| Package name | `com.meridian11.books.bentobar` (developer account Meridian11, 5518103996214773431) |
 | Category | Tools |
 | Tags (up to 5 from Play's list) | Tools, Productivity, Customization, System monitor, Clock |
-| Email address (shown publicly) | kuscher.projects@gmail.com |
-| Website | https://github.com/kuscher/bentobar |
+| Email address (shown publicly) | meridian11labs@gmail.com |
+| Website | https://github.com/Meridian11Labs/bentobar |
 | Phone | leave empty |
-| Privacy policy URL | https://googlebook.studio/privacy/bentobar |
+| Privacy policy URL | https://meridian11.com/privacy/bentobar |
 | Countries | All countries |
 | Contains ads | No |
 | In-app purchases | No |

@@ -13,6 +13,6 @@
     android:canTakeScreenshot="true"
     android:notificationTimeout="0"
     android:isAccessibilityTool="false"
-    android:settingsActivity="io.github.kuscher.bentobar.ui.MainActivity"
+    android:settingsActivity="com.meridian11.books.bentobar.ui.MainActivity"
     android:summary="@string/a11y_summary"
     android:description="@string/a11y_description"/>
