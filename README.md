@@ -265,7 +265,7 @@ It was proudly developed on a Googlebook: written, built and tested on the devic
 itself, in its Linux terminal and on its own Android, from the first probe of the status bar to
 this release.
 
-— Meridian11 LLC
+— Meridian11
 
 ## License
 
@@ -273,4 +273,4 @@ BentoBar is free software under the [MIT License](LICENSE). It includes Google's
 [Material Symbols](https://fonts.google.com/icons) (Apache License 2.0) and uses Jetpack Compose,
 AndroidX, Kotlin and kotlinx.serialization (Apache License 2.0).
 
-BentoBar is an independent project. It isn't made by or affiliated with Google.
+BentoBar is an independent project.
