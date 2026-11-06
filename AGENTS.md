@@ -4,13 +4,14 @@
 own Play listing. Up to 1.6 it was `io.github.kuscher.bentobar`, and DiscoBar, `io.github.kuscher.discobar`, until
 0.4.1.)
 
-A Bartender-style status bar organiser for Googlebooks (Googlebook OS = Android 17 desktop). A
+A status bar organiser for Googlebooks (Googlebook OS = Android 17 desktop). A
 plain APK: no adb grants, root or system changes in the product (the user's hard requirement).
 
 ## This repo is public
 The Play listing links here. Keep out of every file, commit message and release note: device serial numbers and
 adb names, build numbers and codenames, what else is installed or open on the owner's devices, the names of his
 private projects and paths into their repos, and where signing keys are backed up (say "backed up privately").
+Name no other company's app as a model or a comparison, in the app or anywhere here.
 
 ## Layout
 - `app/src/main/java/com/meridian11/books/bentobar/`

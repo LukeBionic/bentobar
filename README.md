@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>Add, hide and organise items in your Googlebook's status bar.</b><br>
-  What Bartender and iStat Menus do for the Mac menu bar, as an ordinary Android app: no root, no adb.
+  Your own items next to the system's icons, as an ordinary Android app: no root, no adb.
 </p>
 
 <p align="center">
@@ -273,5 +273,4 @@ BentoBar is free software under the [MIT License](LICENSE). It includes Google's
 [Material Symbols](https://fonts.google.com/icons) (Apache License 2.0) and uses Jetpack Compose,
 AndroidX, Kotlin and kotlinx.serialization (Apache License 2.0).
 
-BentoBar is an independent project. It isn't made by or affiliated with Google, or with Surtees
-Studios (Bartender) or Bjango (iStat Menus).
+BentoBar is an independent project. It isn't made by or affiliated with Google.

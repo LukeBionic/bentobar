@@ -569,7 +569,7 @@
     <string name="about_credit_frankfurter">Reference exchange rates by the European Central Bank via Frankfurter (frankfurter.dev), MIT License</string>
     <string name="about_who">Who made this</string>
     <string name="about_who_text">Made by Meridian11 LLC (github.com/Meridian11Labs), developed on a Googlebook.</string>
-    <string name="about_independent_text">BentoBar isn\'t made, sponsored or endorsed by Google, or by the makers of Bartender (Surtees Studios) or iStat Menus (Bjango), and it doesn\'t endorse them. The views and choices in it are Meridian11\'s own.</string>
+    <string name="about_independent_text">BentoBar isn\'t made, sponsored or endorsed by Google. The views and choices in it are Meridian11\'s own.</string>
 
     <!-- plurals: system -->
     <plurals name="cpu_menu_subtitle">
