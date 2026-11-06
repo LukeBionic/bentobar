@@ -2,7 +2,7 @@ package com.meridian11.books.bentobar.data
 
 import kotlinx.serialization.Serializable
 
-/** Where an item lives, like Bartender's sections. */
+/** Where an item lives: in the bar, hidden behind ‹, or off. */
 @Serializable
 enum class Section { SHOWN, HIDDEN, OFF }
 
