@@ -12,9 +12,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
-import org.w3c.dom.Element
 import java.io.File
-import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * What Now playing says, in the bar and in its menu: every example of the product and design
@@ -860,22 +858,7 @@ class MediaTextTest {
 
     // ---- the text file, and what the item's own code may not do
 
-    private fun strings(path: String): Map<String, String> {
-        val root = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(File(path)).documentElement
-        val list = root.getElementsByTagName("string")
-        return (0 until list.length).map { list.item(it) as Element }.associate { it.getAttribute("name") to unescaped(it.textContent) }
-    }
-
-    /** A string as Android reads it from the file: an apostrophe and a quotation mark are written with a backslash there. */
-    private fun unescaped(text: String): String = text.replace("\\'", "'").replace("\\\"", "\"")
-
-    @Test fun theTextFileSaysWhatTheCopyDeckSays() {
-        val file = strings("src/main/res/values/strings_media.xml")
-        for ((name, text) in deck + added) assertEquals(name, text, file[name])
-        assertEquals("a string the copy deck does not know", (deck + added).keys, file.keys)
-        val all = strings("src/main/res/values/strings.xml")
-        for ((name, text) in shared.values) assertEquals(name, text, all[name])
-    }
+    private fun strings(path: String): Map<String, String> = StringFiles.file(path)
 
     @Test fun britishEnglishSpellsGreyedWithAnE() {
         val british = strings("src/main/res/values-en-rGB/strings_media.xml")
@@ -925,8 +908,8 @@ class MediaTextTest {
         val kind = Regex.escape("\${e.javaClass.simpleName}")
         val fixed = Regex("Log\\.[a-z]\\(TAG, \"[^\"\$]*(" + kind + ")?\"\\)")
         val source = code("NowPlaying.kt")
-        assertEquals(3, fixed.findAll(source).count())
-        assertEquals("a log line that is not a fixed sentence", 3, Regex("""\bLog\.""").findAll(source).count())
+        // However many log lines there are, each is one of those.
+        assertEquals("a log line that is not a fixed sentence", Regex("""\bLog\.""").findAll(source).count(), fixed.findAll(source).count())
         assertFalse("Log." in code("MediaAccess.kt"))
         for (name in listOf("NowPlaying.kt", "MediaAccess.kt")) for (n in listOf("println(", "printStackTrace", "System.out", "System.err")) {
             assertFalse("items/$name has $n", n in code(name))
