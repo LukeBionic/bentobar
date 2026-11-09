@@ -136,7 +136,7 @@ class BarController(private val service: AccessibilityService) {
         var value: Boolean
             get() = state.value
             set(v) {
-                state.value = v; Ticker.revealHidden = v || menuKey == "bentobar"; if (v) Ticker.refresh()
+                state.value = v; Ticker.revealHidden = v || menuKey == MenuKey.Bar; if (v) Ticker.refresh()
                 // Out: a click anywhere else folds them away again (see [outsideClick]).
                 strip.watchOutside(v)
             }
@@ -155,17 +155,17 @@ class BarController(private val service: AccessibilityService) {
     }
     private var menu: MenuWindow? = null
     // Observable, so the strip's highlight can stay on the item whose popup is open (StripHost).
-    private var menuKey: String? by mutableStateOf(null)
+    private var menuKey: MenuKey? by mutableStateOf(null)
     /**
      * The popup a press on its own item just closed: that press's click, which reaches the strip after the
      * popup heard of the press, is spent (it would open the popup again). Only that one click, and only for a
      * moment: a second click turns the popup round while it is still folding away.
      */
-    private var spentKey: String? = null
+    private var spentKey: MenuKey? = null
     private var spentAt = 0L
     /** A popup still folding away, and its key: clicked again meanwhile, it turns round. */
     private var leaving: MenuWindow? = null
-    private var leavingKey: String? = null
+    private var leavingKey: MenuKey? = null
     /** It is folding away so that something can run once it is off the screen (a screenshot): it doesn't turn round. */
     private var leavingThen = false
     private var snap: BarSnapshot? = null
@@ -593,8 +593,8 @@ class BarController(private val service: AccessibilityService) {
                 heightDp = heightDp.value,
                 events = events,
                 onOverflow = { ids -> main.post { if (BarOverflow.ids.value != ids) { BarOverflow.ids.value = ids; main.post(scanNow) } } },
-                // The item a popup belongs to: "item:<id>" and "ctx:<id>" (its right-click menu) are the item's, "bentobar" is ‹'s.
-                open = menuKey?.let { if (it == "bentobar") "chevron" else it.substringAfter(':', "").ifEmpty { null } },
+                // The item a popup belongs to: an item's popup and its right-click menu are the item's, the ‹ menu is ‹'s.
+                open = menuKey?.owner?.ifEmpty { null },
             )
         }
     }
@@ -645,15 +645,15 @@ class BarController(private val service: AccessibilityService) {
             val type = Items.of(item.type) ?: return
             if (type.onClick(item)) { Ticker.refresh(); return }
             if (type.menu == null) return
-            toggleMenu("item:${item.id}", at, type.menuWidthDp) { host -> ItemMenu(item.id, host) }
+            toggleMenu(MenuKey.Item(item.id), at, type.menuWidthDp) { host -> ItemMenu(item.id, host) }
         }
 
         override fun context(item: ItemConfig, at: Rect) {
             placed[item.id] = at
-            toggleMenu("ctx:${item.id}", at, 280) { host ->
+            toggleMenu(MenuKey.ItemContext(item.id), at, 280) { host ->
                 ItemContextMenu(item.id, host) {
                     val type = Items.of(item.type)
-                    if (type?.menu != null) { closeMenu(dissolve = true); toggleMenu("item:${item.id}", at, type.menuWidthDp) { h -> ItemMenu(item.id, h) } }
+                    if (type?.menu != null) { closeMenu(dissolve = true); toggleMenu(MenuKey.Item(item.id), at, type.menuWidthDp) { h -> ItemMenu(item.id, h) } }
                 }
             }
         }
@@ -738,7 +738,7 @@ class BarController(private val service: AccessibilityService) {
             if (inside && !sliding && type != null &&
                 PopupRules.hoverOpens(menuKey, item.id, hasPopup = type.menu != null, on = Store.config.value.hoverSwitchesPopups)) {
                 placed[item.id] = at
-                toggleMenu("item:${item.id}", at, type.menuWidthDp) { host -> ItemMenu(item.id, host) }
+                toggleMenu(MenuKey.Item(item.id), at, type.menuWidthDp) { host -> ItemMenu(item.id, host) }
                 return
             }
             if (inside && menu == null && !sliding) { tipFor = item to Rect(at); main.postDelayed(showTip, 600) } else hideTip()
@@ -758,14 +758,14 @@ class BarController(private val service: AccessibilityService) {
         }
     }
 
-    private fun barMenu(at: Rect, everything: Boolean) = toggleMenu("bentobar", at, 290) { host ->
+    private fun barMenu(at: Rect, everything: Boolean) = toggleMenu(MenuKey.Bar, at, 290) { host ->
         BentoBarMenu(host, openItem = { item ->
             val type = Items.of(item.type)
             closeMenu(dissolve = true)
             // From the list of every item, an item's menu opens under the item itself.
             val anchor = placed[item.id]?.takeIf { everything } ?: at
             if (type != null && type.onClick(item)) Ticker.refresh()
-            else if (type?.menu != null) toggleMenu("item:${item.id}", anchor, type.menuWidthDp) { h -> ItemMenu(item.id, h) }
+            else if (type?.menu != null) toggleMenu(MenuKey.Item(item.id), anchor, type.menuWidthDp) { h -> ItemMenu(item.id, h) }
         }, hideBar = { Store.update { it.copy(enabled = false) } }, everything = everything)
     }
 
@@ -797,7 +797,7 @@ class BarController(private val service: AccessibilityService) {
      * Opens the popup [key] below [anchor] (strip window coordinates), or closes it if it's open. A popup
      * open for another item dissolves while this one unfolds; one still folding away turns round.
      */
-    fun toggleMenu(key: String, anchor: Rect, widthDp: Int, content: @Composable (MenuHost) -> Unit) {
+    fun toggleMenu(key: MenuKey, anchor: Rect, widthDp: Int, content: @Composable (MenuHost) -> Unit) {
         val now = SystemClock.uptimeMillis()
         hideTip()
         if (menuKey == key) { closeMenu(); return }
@@ -813,7 +813,7 @@ class BarController(private val service: AccessibilityService) {
         closeMenu(dissolve = true) // resets the sampling demand, so the new popup's is set after it
         val s = snap ?: return
         // Before the popup's first frame reads anything (an item's own LaunchedEffect would run after it).
-        key.takeIf { it.startsWith("item:") }?.substringAfter(':')?.let { id ->
+        (key as? MenuKey.Item)?.id?.let { id ->
             Store.config.value.items.firstOrNull { it.id == id }?.let { Items.of(it.type)?.menuOpening(it) }
         }
         val loc = strip.locationOnScreen()
@@ -847,17 +847,16 @@ class BarController(private val service: AccessibilityService) {
             x >= 0 && x < strip.params.width && y >= 0 && y < (snap?.bar?.height() ?: 0)
         // The same rule as the highlight's: a press in a gap belongs to the item on its side of the gap's middle.
         val hit = if (onStrip) PopupRules.pressedItem(x, placed.map { (k, r) -> Span(k, r.left.toFloat(), r.right.toFloat()) }) else null
-        val own = if (key == "bentobar") "chevron" else key.substringAfter(':')
         when (hit) {
             null -> closeMenu()
-            own -> { spentKey = key; spentAt = SystemClock.uptimeMillis(); closeMenu() }
+            key.owner -> { spentKey = key; spentAt = SystemClock.uptimeMillis(); closeMenu() }
             else -> closeMenu(dissolve = true)
         }
     }
 
-    private fun focusMenu(key: String) {
-        Ticker.focusItem = key.removePrefix("item:").takeIf { key.startsWith("item:") }
-        Ticker.revealHidden = expanded.value || key == "bentobar"
+    private fun focusMenu(key: MenuKey) {
+        Ticker.focusItem = (key as? MenuKey.Item)?.id
+        Ticker.revealHidden = expanded.value || key == MenuKey.Bar
         Ticker.start("menu")
     }
 
