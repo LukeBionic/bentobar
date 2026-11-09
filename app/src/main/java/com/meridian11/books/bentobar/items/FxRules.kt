@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.text.DecimalFormatSymbols
@@ -202,13 +203,15 @@ object FxRules {
     private fun dateOf(table: FxTable): LocalDate? = runCatching { LocalDate.parse(table.date) }.getOrNull()
 
     /**
-     * A move counts as news only while its table is from today or yesterday (UTC): the bank publishes once a working day,
-     * so a Friday table is still the latest on Sunday and Monday morning, and its move is not this weekend's. The rate itself stays.
+     * A move counts as news only while its table is from today (UTC), or from yesterday when today is a weekday: the bank
+     * publishes once a working day, so before it has published (early on a weekday) the newest table is yesterday's, but at the
+     * weekend nothing new is coming and a Friday table's move is not this weekend's. The rate itself stays.
      */
     fun bigMove(quotes: List<PairQuote>, table: FxTable, thresholdPct: Double, now: Long): Boolean {
         val date = dateOf(table) ?: return false
         val today = Instant.ofEpochMilli(now).atZone(ZoneOffset.UTC).toLocalDate()
-        return !date.isBefore(today.minusDays(1)) && quotes.any { abs(it.changePct) >= thresholdPct }
+        val weekday = today.dayOfWeek != DayOfWeek.SATURDAY && today.dayOfWeek != DayOfWeek.SUNDAY
+        return !date.isBefore(if (weekday) today.minusDays(1) else today) && quotes.any { abs(it.changePct) >= thresholdPct }
     }
 
     /** The day of [table]'s rates when that isn't today where the device is ([zone]), to go with the numbers; null when it is, or when the table has no date. */

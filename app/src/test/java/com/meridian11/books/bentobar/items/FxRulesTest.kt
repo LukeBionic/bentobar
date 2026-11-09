@@ -142,10 +142,11 @@ class FxRulesTest {
     private val big = FxRules.FxTable(mapOf("EUR" to 1.0, "USD" to 1.05), mapOf("EUR" to 1.0, "USD" to 1.0), date = "2026-10-30")
     private val usd = listOf(FxRules.FxPair("EUR", "USD"))
 
-    @Test fun aMoveCountsOnlyWhileItsTableIsFromTodayOrYesterdayUtc() {
+    @Test fun aMoveCountsWhileItsTableIsFromTodayOrOnAWeekdayYesterdayUtc() {
         val quotes = FxRules.quotesFor(usd, big)
         assertTrue("Friday's rates on Friday", FxRules.bigMove(quotes, big, 1.0, at("2026-10-30")))
-        assertTrue("and within the day after", FxRules.bigMove(quotes, big, 1.0, at("2026-10-31", "23:59:00")))
+        assertFalse("Saturday: no new table is coming, so Friday's move is not today's", FxRules.bigMove(quotes, big, 1.0, at("2026-10-31", "00:00:00")))
+        assertTrue("a weekday morning, before the bank has published", FxRules.bigMove(quotes, FxRules.FxTable(big.latest, big.previous, date = "2026-11-02"), 1.0, at("2026-11-03", "08:00:00")))
         assertFalse("Sunday: Friday's move is not news", FxRules.bigMove(quotes, big, 1.0, at("2026-11-01", "00:00:00")))
         assertFalse("Monday morning, still Friday's table", FxRules.bigMove(quotes, big, 1.0, at("2026-11-02", "08:00:00")))
     }
