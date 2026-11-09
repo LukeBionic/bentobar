@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
             handle(intent)
             // First opening, service still off: the disclosure comes up by itself, in the app's normal
             // use, not behind a page someone has to find. Once answered, only Turn on brings it back.
-            disclosure = Store.consent.value == Store.Consent.NOT_ASKED && !serviceOn(this) && !turnedOn(this) && !Env.advancedProtection()
+            disclosure = ConsentRules.asksOnFirstOpening(Store.consent.value, { serviceOn(this) }, { turnedOn(this) }, { Env.advancedProtection() })
         } else {
             page = savedInstanceState.getInt(STATE_PAGE); selected = savedInstanceState.getString(STATE_SELECTED)
             disclosure = savedInstanceState.getBoolean(STATE_DISCLOSURE)
@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
      * disclosure, and Agree there opens the settings.
      */
     private fun turnOn() {
-        if (Store.consent.value == Store.Consent.AGREED) openAccessibility(this) else disclosure = true
+        if (ConsentRules.turnOn(Store.consent.value) == ConsentRules.TurnOn.OPEN_SETTINGS) openAccessibility(this) else disclosure = true
     }
 
     private fun handle(intent: Intent?) {
