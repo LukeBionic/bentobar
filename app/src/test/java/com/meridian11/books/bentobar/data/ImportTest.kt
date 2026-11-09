@@ -16,25 +16,33 @@ class ImportTest {
         assertEquals(c, Store.parseLayout(json.encodeToString(BarConfig.serializer(), c)))
     }
 
-    /** A layout as a later version may write it: a position, a section and a display this version doesn't know. */
-    private val fromLater = """{"version":9,"position":"TOP","items":[
+    /** A value this version doesn't know inside a layout of its own version: a position, a section and a display a later build may add without a new version number. */
+    private val laterValues = """{"version":$LAYOUT_VERSION,"position":"TOP","items":[
         {"id":"c","type":"clock","section":"SOMEWHERE","display":"FANCY","options":{"seconds":"true"}},
         {"id":"t","type":"timer"}],"spacing":7}"""
 
-    @Test fun aStoredLayoutWithAValueThisVersionDoesntKnowStillReads() {
+    @Test fun aValueThisVersionDoesntKnowFallsBackToItsDefault() {
         // Unreadable, the whole layout was replaced by the defaults, and the next edit made that for good.
-        val c = Store.decode(fromLater)!!
+        val c = Store.parseLayout(laterValues)!!
         assertEquals(Position.RIGHT, c.position)
         assertEquals(listOf("c", "t"), c.items.map { it.id })
         assertEquals(Section.SHOWN, c.items[0].section)
         assertEquals(Display.ICON_AND_TEXT, c.items[0].display)
         assertEquals("true", c.items[0].options["seconds"])
         assertEquals(7, c.spacing)
-        assertNull(Store.decode("not a layout"))
+        assertNull(Store.parseLayout("not a layout"))
     }
 
-    @Test fun aPastedLayoutWithAValueThisVersionDoesntKnowStillPastes() {
-        assertEquals(listOf("c", "t"), Store.parseLayout(fromLater)!!.items.map { it.id })
+    @Test fun aLayoutFromANewerVersionIsRefusedAndNotClamped() {
+        val newer = """{"version":${LAYOUT_VERSION + 1},"items":[{"id":"c","type":"clock"}]}"""
+        assertEquals(LayoutRead.Newer(LAYOUT_VERSION + 1), readLayout(newer))
+        assertNull(Store.parseLayout(newer))
+    }
+
+    @Test fun aNewerVersionIsToldApartEvenWhenTheRestCantBeRead() {
+        // Its fields may have changed shape: it is still a newer layout, not a damaged one.
+        val shapeChanged = """{"version":${LAYOUT_VERSION + 2},"position":{"edge":"top"},"items":[]}"""
+        assertEquals(LayoutRead.Newer(LAYOUT_VERSION + 2), readLayout(shapeChanged))
     }
 
     @Test fun somethingElseOnTheClipboardIsNotALayout() {

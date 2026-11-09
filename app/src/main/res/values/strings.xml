@@ -496,6 +496,13 @@
     <string name="look_copy">Copy settings</string>
     <string name="look_restored">Settings restored</string>
     <string name="look_not_settings">No BentoBar settings on the clipboard</string>
+    <string name="look_paste_newer">Those settings come from a newer BentoBar. Update BentoBar to use them.</string>
+    <string name="look_kept_readable">A layout BentoBar couldn\'t read earlier was kept, and it can be read now.</string>
+    <string name="look_kept_newer">A layout from a newer BentoBar was set aside. Update BentoBar and it can be put back.</string>
+    <string name="look_kept_unreadable">A saved layout couldn\'t be read, so BentoBar started fresh. The old one was kept.</string>
+    <string name="look_kept_restore">Put it back</string>
+    <string name="look_kept_copy">Copy it</string>
+    <string name="look_kept_discard">Discard</string>
     <string name="look_paste">Paste settings</string>
     <string name="setup_optional">optional</string>
     <string name="setup_done">done</string>

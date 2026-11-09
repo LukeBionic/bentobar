@@ -45,7 +45,7 @@ class DebugReceiver : BroadcastReceiver() {
                 "cfg" -> Store.export()
                 "import" -> { // a whole layout, base64 JSON (e.g. to restore one saved with cfg)
                     val json = String(android.util.Base64.decode(args[1], android.util.Base64.DEFAULT))
-                    if (Store.import(json)) "imported" else "not a BentoBar layout"
+                    if (Store.import(json) is com.meridian11.books.bentobar.data.LayoutRead.Ok) "imported" else "not a BentoBar layout"
                 }
                 "reset" -> { Store.update { Defaults.config().copy(onboarded = it.onboarded) }; "reset" }
                 "add" -> Store.add(args[1], args.getOrNull(2)?.let { Section.valueOf(it.uppercase()) } ?: Section.SHOWN)

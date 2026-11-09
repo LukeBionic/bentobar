@@ -60,6 +60,7 @@ import com.meridian11.books.bentobar.data.Position
 import com.meridian11.books.bentobar.data.Section
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.data.HiddenMode
+import com.meridian11.books.bentobar.data.LayoutRead
 import com.meridian11.books.bentobar.data.Online
 import com.meridian11.books.bentobar.data.Uses
 import com.meridian11.books.bentobar.data.TextSize
@@ -217,9 +218,43 @@ fun LookPage() {
             OutlinedButton(onClick = {
                 // Its own text only (a layout always is): a copied file isn't opened on the main thread to find out.
                 val text = context.getSystemService(ClipboardManager::class.java)?.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
-                Toast.makeText(context, res.getString(if (Store.import(text)) R.string.look_restored else R.string.look_not_settings), Toast.LENGTH_SHORT).show()
+                val said = when (Store.import(text)) {
+                    is LayoutRead.Ok -> R.string.look_restored
+                    is LayoutRead.Newer -> R.string.look_paste_newer
+                    LayoutRead.NotALayout -> R.string.look_not_settings
+                }
+                Toast.makeText(context, res.getString(said), Toast.LENGTH_SHORT).show()
             }) { Text(stringResource(R.string.look_paste)) }
         }
+        val aside by Store.setAside.collectAsState()
+        aside?.let { why -> SetAsideOffer(why) }
+    }
+}
+
+/**
+ * A layout that could not be read was kept instead of being lost, and this is where it is offered, until it is put back or
+ * discarded. Putting it back is only ever the user's press, never something done by itself over their edits.
+ */
+@Composable
+private fun SetAsideOffer(why: Store.SetAside) {
+    val context = LocalContext.current
+    val res = androidx.compose.ui.platform.LocalResources.current
+    Spacer(Modifier.height(10.dp))
+    Text(stringResource(when (why) {
+        Store.SetAside.READABLE_NOW -> R.string.look_kept_readable
+        Store.SetAside.FROM_NEWER_VERSION -> R.string.look_kept_newer
+        Store.SetAside.UNREADABLE -> R.string.look_kept_unreadable
+    }), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(6.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (why == Store.SetAside.READABLE_NOW) FilledTonalButton(onClick = { Store.restoreSetAside() }) { Text(stringResource(R.string.look_kept_restore)) }
+        OutlinedButton(onClick = {
+            Store.setAsideText()?.let { text ->
+                context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(res.getString(R.string.look_clip_label), text))
+                Toast.makeText(context, res.getString(R.string.look_copied), Toast.LENGTH_SHORT).show()
+            }
+        }) { Text(stringResource(R.string.look_kept_copy)) }
+        TextButton(onClick = { Store.discardSetAside() }) { Text(stringResource(R.string.look_kept_discard)) }
     }
 }
 

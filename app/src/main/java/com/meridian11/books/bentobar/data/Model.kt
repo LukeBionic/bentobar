@@ -78,9 +78,15 @@ fun List<ItemConfig>.moved(id: String, section: Section, index: Int): List<ItemC
 @androidx.compose.runtime.Immutable
 data class WorldCity(val zone: String, val name: String = "")
 
+/**
+ * The newest layout version this build understands, and the one it writes. A layout that says more is refused
+ * ([readLayout]), never clamped.
+ */
+const val LAYOUT_VERSION = 3
+
 @Serializable
 data class BarConfig(
-    val version: Int = 3,
+    val version: Int = LAYOUT_VERSION,
     /** Master switch (the Quick Settings tile flips it, e.g. for presenting). */
     val enabled: Boolean = true,
     val items: List<ItemConfig> = emptyList(),
@@ -144,7 +150,7 @@ val ItemConfig.spacerWidthDp: Int get() = optInt("width", 12).coerceIn(SPACER_DP
  */
 val LOCAL_SETTINGS = setOf("enabled", "presenting", "pinnedOpen", "turnedOff", "onboarded")
 
-private val layoutJson = Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true }
+internal val layoutJson = Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true }
 
 /** This config with the [LOCAL_SETTINGS] taken from [local] (see [Store.import]). */
 fun BarConfig.keepingLocal(local: BarConfig): BarConfig {
