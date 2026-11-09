@@ -23,15 +23,17 @@ sealed interface LayoutRead {
  * version 4 has one place to go and one place to be tested.
  *
  * A layout is a JSON object with an items list: `{}` or another app's settings is not one, and would otherwise replace
- * the bar with an empty one. Its version is read first, before anything else in it, so a newer layout is told from a
- * damaged one even when it is shaped differently. An unknown value (a later version's enum constant) still falls back to
+ * the bar with an empty one. Every version must keep a top-level `items` key (that is how a layout is told from something
+ * else); after that its version is read before anything else, so a newer layout is told from a damaged one even when
+ * its items are shaped differently. An unknown value (a later version's enum constant) still falls back to
  * the field's default inside a layout of a known version, as `coerceInputValues` makes it.
  */
 fun readLayout(raw: String): LayoutRead {
     val root = runCatching { layoutJson.parseToJsonElement(raw) }.getOrNull() as? JsonObject ?: return LayoutRead.NotALayout
-    if (root["items"] !is JsonArray) return LayoutRead.NotALayout
+    if (root["items"] == null) return LayoutRead.NotALayout
     val version = (root["version"] as? JsonPrimitive)?.intOrNull
     if (version != null && version > LAYOUT_VERSION) return LayoutRead.Newer(version)
+    if (root["items"] !is JsonArray) return LayoutRead.NotALayout
     val decoded = runCatching { layoutJson.decodeFromJsonElement(BarConfig.serializer(), root) }.getOrNull() ?: return LayoutRead.NotALayout
     val read = decoded.migrateToV2().migrateToV3().let { it.copy(items = it.items.distinctBy { item -> item.id }) }
     return LayoutRead.Ok(read, changed = read != decoded)

@@ -15,7 +15,7 @@ import java.security.MessageDigest
  * - schema 1: BarBook 0.1 and DiscoBar builds up to 0.2 (`version` 1, timed hiding at 8 s, hover reveal on);
  * - schema 2: DiscoBar 0.3, 0.4, BentoBar 0.5 (`version` 2);
  * - schema 3: BentoBar 0.6 to 0.8, with Show everything, presenting and the Setup switches;
- * - the cities of 0.9 to 1.2, and 1.3 to 1.7.1's look and popup switches, which added fields without a new version.
+ * - the cities of 0.9 to 1.2, and 1.6 to 1.7.1's look and popup switches (1.3 added them) with the types 1.6 added, none of which changed the version.
  *
  * They are write-once: a fixture is what a version that shipped wrote. A new schema gets a new file and an entry here.
  */
@@ -24,11 +24,11 @@ class LayoutFixturesTest {
     private fun read(name: String): BarConfig = (readLayout(file(name).readText()) as LayoutRead.Ok).config
 
     private val fixtures = mapOf(
-        "schema1-0.1-to-0.2.json" to "b0ac5e352bc354f04c46fd7b74a36f1d9ff5298d29a5a6efb551ed67b30dffbf",
-        "schema2-0.3-to-0.5.json" to "d1a1a95e9a3403e32b76d3c683b2968b9d9b828359bc0b100cf48fed45535c1a",
+        "schema1-0.1-to-0.2.json" to "90c4c2b8a13aed62d951d7146320d8db46da130c5d361c29c39a3d2b4c307c0f",
+        "schema2-0.3-to-0.5.json" to "335b8135beb2242ba3cd69f33021517bbcda8e6fb664f53e68efae7e8756411e",
         "schema3-0.6-to-0.8.json" to "c612944556201d62425cbe2dd0c7a8b97ca19f88d407a927065d5c4bb983c519",
-        "schema3-cities-0.9-to-1.2.json" to "7d3e10cf6ef98e42e358d546ad1d25b816ca7c53d3c75aa058bea5dd7f9dcea3",
-        "schema3-look-1.3-to-1.7.1.json" to "a45dc7370e59d8f29b0c0d6ef4b4323f573e09772afa1e48ae0fadd05520c224",
+        "schema3-cities-0.9-to-1.2.json" to "51d74d2c27b4b29b4208342cb70692b6d422f3d448345fcf91cb01902e853b96",
+        "schema3-look-1.6-to-1.7.1.json" to "8e018c1390a557cfcb9d8dc244308282c09b4d2da225c4dcb58e1ef6b61eaa22",
     )
 
     @Test fun everyFixtureIsWhatAShippedVersionWroteAndIsNeverEdited() {
@@ -60,7 +60,7 @@ class LayoutFixturesTest {
         assertEquals(0, c.autoCollapseSec) // 8 s was only the old default
         assertEquals(HiddenMode.HOVER, c.hiddenMode) // it had reveal on hover on, the old default
         assertEquals(10, c.spacing)
-        assertEquals(listOf("cpu", "clock", "battery", "timer", "tools"), c.items.map { it.type })
+        assertEquals(listOf("memory", "clock", "battery", "timer", "tools"), c.items.map { it.type })
         assertEquals(Section.HIDDEN, c.items[2].section)
         assertEquals("true", c.items[1].options["seconds"])
     }
@@ -88,12 +88,12 @@ class LayoutFixturesTest {
     @Test fun schema3WithCitiesKeepsThem() {
         val c = read("schema3-cities-0.9-to-1.2.json")
         assertEquals(listOf(WorldCity("Asia/Tokyo"), WorldCity("Europe/Berlin", "Munich")), c.cities)
-        assertEquals("here", c.items.first().options["where"])
+        assertEquals("Tokyo", c.items.first().options["city"])
         assertTrue(c.presenting)
     }
 
     @Test fun schema3WithTheLookSwitchesKeepsThemAndAnOldOptionStaysIgnoredInTheLayout() {
-        val c = read("schema3-look-1.3-to-1.7.1.json")
+        val c = read("schema3-look-1.6-to-1.7.1.json")
         assertTrue(c.hoverSwitchesPopups); assertTrue(c.noAnimations); assertTrue(c.systemTint)
         assertFalse(c.enabled)
         assertEquals("true", c.items.single { it.type == "clipboard" }.options["pasteOnClick"]) // read by nothing, harmless

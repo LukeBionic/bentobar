@@ -45,6 +45,12 @@ class ImportTest {
         assertEquals(LayoutRead.Newer(LAYOUT_VERSION + 2), readLayout(shapeChanged))
     }
 
+    @Test fun aNewerVersionIsToldApartEvenWhenItsItemsChangedShape() {
+        assertEquals(LayoutRead.Newer(LAYOUT_VERSION + 1), readLayout("""{"version":${LAYOUT_VERSION + 1},"items":{"shown":[]}}"""))
+        assertEquals(LayoutRead.NotALayout, readLayout("""{"version":${LAYOUT_VERSION + 1},"theme":"dark"}"""))
+        assertEquals(LayoutRead.NotALayout, readLayout("""{"version":$LAYOUT_VERSION,"items":{}}"""))
+    }
+
     @Test fun somethingElseOnTheClipboardIsNotALayout() {
         // Each of these used to replace the bar with an empty one.
         assertNull(Store.parseLayout("{}"))

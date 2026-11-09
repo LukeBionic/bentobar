@@ -448,7 +448,7 @@ private fun RowScope.RowBody(item: ItemConfig, state: ItemState?) {
     Column(Modifier.weight(1f)) {
         Text(rowName(item), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
         val overflow by com.meridian11.books.bentobar.bar.BarOverflow.ids.collectAsState()
-        val detail = if (type == null) stringResource(R.string.row_from_newer_detail) else listOfNotNull(
+        val detail = if (type == null) "" else listOfNotNull(
             if (item.id in overflow) stringResource(R.string.row_overflow) else null,
             state?.text?.takeIf { it.isNotBlank() },
             // The rule in short ("shows above 80% CPU"), so the list says when each hidden item pops out.

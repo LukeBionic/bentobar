@@ -239,7 +239,8 @@ private fun SetAsideOffer(why: Store.SetAside) {
     Spacer(Modifier.height(6.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         if (why == Store.SetAside.READABLE_NOW) FilledTonalButton(onClick = { Store.restoreSetAside() }) { Text(stringResource(R.string.look_kept_restore)) }
-        OutlinedButton(onClick = {
+        // Only an unreadable layout needs this: a readable one can be put back and copied as settings, a newer one waits for an update.
+        if (why == Store.SetAside.UNREADABLE) OutlinedButton(onClick = {
             Store.setAsideText()?.let { text ->
                 context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(res.getString(R.string.look_clip_label), text))
                 Toast.makeText(context, res.getString(R.string.look_copied), Toast.LENGTH_SHORT).show()
