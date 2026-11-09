@@ -81,9 +81,9 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     `Timers` runs it on Android. `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,
     glyph icons, `Chips` for the Live Update chip), `TextRules` (text from a layout or a reply as one line,
     counted as a reader counts it), and the item types: several each in
-    `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own
-    (`CpuItem`, `ClockItem`, `SoundItem`, `MediaItem`, `DevicesItem`, `HeatItem`, `WeatherItem`,
-    `FlightItem`, `ShortcutItem` with its pure `ShortcutRules`, `StocksItem`). `WeatherHere` is My location for every item that uses it
+    `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own, named by pattern:
+    `<Name>Item.kt` is the type, `<Name>Rules.kt` its pure rules, `<Name>Load.kt` its loading, `<Name>Menu.kt` its popup, and
+    `<Name>Text.kt` its words (not every item has all of them; `ls items/` is the list, `Items.all` the registry). `WeatherHere` is My location for every item that uses it
     (what it does is the pure `HereKeeper`, on `HereRules`; the `Ticker` drives it once per tick): Android's approximate location, in memory
     only, rounded to 0.1° in `WeatherHere.place`, the only form anything else gets; its reading is never kept on the device, and the layout holds `where=here` and never
     a place. A type gets `onLive()`,
@@ -167,7 +167,6 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   saves a PNG of one of BentoBar's own windows (no pointer, no other apps; written to the debug
   app's cache and pulled with run-as, since a broadcast result can't carry a big image).
 - `docs/research/`: the device findings (probe results) and the official-docs research, with URLs.
-- `probe/`: the throwaway feasibility probe (Gradle-free build). Not part of the app.
 
 ## Before a PR
 - Run `./gradlew :app:testDebugUnitTest :app:testComposeTestUnitTest :app:lintDebug :app:assembleRelease` (CI's `check` runs
@@ -218,10 +217,12 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   Behind the glass other windows show through, blurred: don't publish captures with private windows behind.
 - Release (`docs/RELEASING.md`): bump `versionCode` and `versionName`, add `docs/release-notes/<version>.md`
   and Play's "What's new" (`release-notes.txt` in the store kit, 500 characters at most; the store kit is kept
-  privately, outside this repo), commit, push, then `git tag v<version> && git push origin v<version>`. GitHub
-  Actions (`.github/workflows/release.yml`) builds, signs and publishes: `BentoBar.apk` + `SHA256SUMS` as the
-  GitHub release, the bundle as a draft on Google Play's closed-testing track. Someone still presses
-  "Send for review" in the Play Console. "Run workflow" on the Actions tab is a dry run.
+  privately, outside this repo), commit on a branch and merge it by pull request (`main` requires the CI check `check`;
+  nothing is pushed to it directly), then `git tag v<version>` on the merged commit and push the tag. GitHub
+  Actions (`.github/workflows/release.yml`) builds, signs and checks the minified APK, then makes a DRAFT GitHub release
+  with `BentoBar.apk`, `SHA256SUMS` and R8's `mapping.txt`; someone installs the draft, runs it and publishes it. The
+  Play job is switched off while the repository variable `PLAY_UPLOAD` is `off` (it is), and says so in a warning; the
+  bundle is then only the run's `bundle` artifact. "Run workflow" on the Actions tab is a dry run.
 - The release key (alias `bentobar`, cert SHA-256 AA:07:4B:07:…:BD:90:CE:93, CN=BentoBar, O=Meridian11 LLC; made
   2026-11-03 for 1.7, the one Google Play uses too) lives in the secrets of the GitHub environment
   `release`; you never need the key file. The keystore and its password are backed up privately,
@@ -229,7 +230,7 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   On a machine that has `~/.config/bentobar/keystore.jks` and `keystore.pass`, `./gradlew :app:assembleRelease`
   still signs with it; without them the release build is unsigned. A debug and a release install
   can't replace each other (different keys), so uninstall first.
-- `./bento` takes `ADB_SERVER_SOCKET` and `ANDROID_SERIAL` from the environment (see its header). In the Linux terminal on a
+- `./bento` picks its device from `ANDROID_SERIAL`, else `BENTO_MODEL` (matched in `adb devices -l`), else the one attached device, and refuses anything but exactly one (see its header); `ADB_SERVER_SOCKET` passes through. In the Linux terminal on a
   Googlebook every TCP port is forwarded to Android, so point `ADB_SERVER_SOCKET` at a Unix socket there, never tcp:5037.
 
 ## Things learned the hard way (see docs/research/device-findings.md)
@@ -358,8 +359,8 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
 - Live Update chips show only ONE per app, drop text over about 7 characters, and are hidden while
   the posting app is "visible" (uid TOP). **BentoBar's own settings window open means no chip.**
   With only the accessibility service running (BFGS) the chip shows.
-- The Agent-task status bar API is in the platform-37.2 SDK stubs but not on the device (37.1),
-  and it needs the assistant role anyway. We compile against 37.2 stubs: check each new API on
+- The Agent-task status bar API is in a newer platform's SDK stubs than the one we compile against (compileSdk 37
+  resolves to platform 37.0) and not on the device, and it needs the assistant role anyway. Check each new API on
   the device.
 - `ACTION_ACCESSIBILITY_DETAILS_SETTINGS` isn't public; we open Accessibility settings with the
   `:settings:fragment_args_key` highlight extras.
