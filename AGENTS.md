@@ -393,6 +393,9 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   ending it early; the timer alarm is `ELAPSED_REALTIME_WAKEUP`, armed again in `Timers.init` (alarms
   don't survive a reboot). Live Update calls (`setRequestPromotedOngoing`, `setShortCriticalText`) are
   API 36.1: behind `Notify.liveUpdates`, since minSdk is 34.
+- **A finished timer's notification is what rings.** The `alerts` channel carries the alarm tone, so the ring lasts while
+  the notification (`Notify.ID_DONE`) is up. `Timers.stop` cancels it, which is how the item's Stop ends a ring; the Clock
+  app's `DISMISS_TIMER` intent is for the Clock app's timers and does nothing here. Tone and length are the channel's.
 - **Notification actions launch activities directly** (`PendingIntent.getActivity` for the chip's Join
   and Open). A broadcast receiver that then starts an activity is a notification trampoline, blocked
   for targetSdk 31+, and the chip shows exactly when the accessibility service (whose binding allows

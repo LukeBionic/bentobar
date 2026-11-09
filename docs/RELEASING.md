@@ -63,7 +63,7 @@ learned the hard way" says why. Run it again on every new draft.
   maximized, and after restoring a window.
 - **Unlock.** Lock and unlock: within about ten seconds the strip's colour matches the bar's again (it once stayed white
   after the lock screen's light icons).
-- **Full screen.** An app in full screen hides the strip when the bar hides (about 2 s after the app goes full screen)
+- **Full screen.** An app in full screen hides the strip when the bar hides (at once on some systems, up to about 2 s on others)
   and brings it back when the bar returns; a shade or the keyboard's full-screen key behave the same.
 - **The empty strip.** With every item hidden or empty there is no stray window and no invisible overlay (Play Protect
   flagged one); Settings shows the strip as empty.
@@ -74,7 +74,10 @@ learned the hard way" says why. Run it again on every new draft.
 - **Live Update chip.** A timer or a meeting shows its chip with BentoBar's settings window closed.
 - **Items that tick.** A clock and a network speed item do not make neighbours move; the bar's CPU use stays low
   (about 1% of one core on a release build).
-- **Keep awake and timers.** Keep awake keeps the screen on, ends when switched off, and a timer rings once and stops.
+- **Keep awake and timers.** Keep awake keeps the screen on and ends when switched off. A finished timer rings once, through
+  its notification (only with notifications allowed), and the ring ends when that notification is dismissed or the item's
+  Stop is pressed. The Clock app's `DISMISS_TIMER` intent does not reach BentoBar's ring, so do not use it to stop one on
+  the device; dismiss the notification. Allow notifications for a timer test only, and take the permission back after.
 - **Update over the old release.** Installed over the previous release (same key), the layout and the accessibility
   switch are still there.
 - **Online services.** With them off nothing is asked; weather shows the placeholder, not an error.
