@@ -31,7 +31,7 @@ object AirItem : ItemType("air", R.string.item_air_title, Sym.AIR, R.string.item
         type = type,
         service = online,
         every = { _, r -> AirRules.every(r) },
-        load = { place, last -> AirLoad.load(place, last, Now.wall()) },
+        load = { place, last -> AirLoad.load(place, last, Now.wall(), Now.elapsed()) },
     )
 
     private val staged = Staged<AirReading>(type)

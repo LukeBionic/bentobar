@@ -31,9 +31,9 @@ object AirLoad {
     /**
      * Asks the service about [place]; blocks, so only a background load calls it. A good answer is a new reading; a failure is a
      * reading too, with what went wrong and the numbers there were. Null: it was not asked after all (the switch went off or
-     * the bar hid under the load). [now] is the wall clock and [up] the time since boot, both of this moment.
+     * the bar hid under the load). [now] is the wall clock and [up] the time since boot, both of this moment. No default for [up]: a caller that left it out would give the reading no second clock (Pace.old counts it only above 0).
      */
-    fun load(place: Place, last: AirReading?, now: Long, up: Long = 0): AirReading? {
+    fun load(place: Place, last: AirReading?, now: Long, up: Long): AirReading? {
         val reply = Http.get(request(place))
         val good = (reply as? Reply.Ok)?.let { AirRules.read(it.text, place, now, up) }
         if (good != null) return good

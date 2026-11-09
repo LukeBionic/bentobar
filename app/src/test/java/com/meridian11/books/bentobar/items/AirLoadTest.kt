@@ -42,7 +42,7 @@ class AirLoadTest : OnlineServiceContract<AirReading>() {
     @Test fun aFailureForAnotherPlacesReadingKeepsNothingOfIt() = FakeHttp.use { net ->
         net.fail(Host.OPEN_METEO_AIR, "/v1/air-quality", com.meridian11.books.bentobar.net.Why.TIMEOUT)
         val other = AirReading("1.00,2.00", usAqi = 50, fetchedAt = now)
-        assertNull(AirLoad.load(zurich, other, now)!!.usAqi)
+        assertNull(AirLoad.load(zurich, other, now, up = 500L)!!.usAqi)
     }
 
     @Test fun aGoodAnswerIsMarkedWithBothClocks() = FakeHttp.use { net ->
