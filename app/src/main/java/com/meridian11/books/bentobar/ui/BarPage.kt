@@ -29,6 +29,8 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import com.meridian11.books.bentobar.items.Trigger
@@ -61,10 +63,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -120,17 +118,15 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
     val cfg by Store.config.collectAsState()
     val states by Ticker.states.collectAsState()
     val item = cfg.items.firstOrNull { it.id == selected }
-    val snackbar = remember { SnackbarHostState() }
     val deleted by Undo.deleted.collectAsState()
     val res = androidx.compose.ui.platform.LocalResources.current
     LaunchedEffect(deleted) {
         val d = deleted ?: return@LaunchedEffect
         val name = Items.of(d.item.type)?.title ?: res.getString(R.string.bar_deleted_fallback)
-        if (Undo.offered(d, SystemClock.elapsedRealtime()) &&
-            snackbar.showSnackbar(res.getString(R.string.bar_deleted, name), res.getString(R.string.bar_undo),
-                duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) Undo.restore(d)
-        // Not when the page goes first (a recreated window offers it again, within [Undo.offered]'s time).
-        Undo.deleted.compareAndSet(d, null)
+        if (!Undo.offered(d, SystemClock.elapsedRealtime())) { Undo.deleted.compareAndSet(d, null); return@LaunchedEffect }
+        // The window's one snackbar, like every other message. Forgotten once it has had its time, not when the page goes
+        // first (a recreated window offers it again, within [Undo.offered]'s time).
+        Notice.post(res.getString(R.string.bar_deleted, name), res.getString(R.string.bar_undo), onAction = { Undo.restore(d) }, onGone = { Undo.deleted.compareAndSet(d, null) })
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 900.dp
@@ -159,8 +155,6 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
                 }
             }
         }
-        // Last, so it's drawn over the section cards (in a Box, later children are on top).
-        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
     }
 }
 
@@ -219,17 +213,22 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
         bar.barDark -> Brush.horizontalGradient(listOf(Color(0xFF5B6F8A), Color(0xFF3F6F73), Color(0xFF4F7E78)))
         else -> Brush.horizontalGradient(listOf(Color(0xFFDDE6F3), Color(0xFFD5E8E6), Color(0xFFE3EEE9)))
     }
-    val events = object : StripEvents {
-        override fun click(item: ItemConfig, at: Rect) = onSelect(item.id)
-        override fun context(item: ItemConfig, at: Rect) = onSelect(item.id)
-        override fun scroll(item: ItemConfig, steps: Int) { Items.of(item.type)?.onScroll(item, steps); Ticker.refresh() }
+    val select by androidx.compose.runtime.rememberUpdatedState(onSelect)
+    // One object for the page's life, as the bar's own events are: rebuilt each time, every item would redraw on every tick.
+    val events = remember { object : StripEvents {
+        override fun click(item: ItemConfig, at: Rect) = select(item.id)
+        override fun context(item: ItemConfig, at: Rect) = select(item.id)
+        // The picture only selects: a wheel over it must not start a timer that later rings, or change the volume.
+        override fun scroll(item: ItemConfig, steps: Int) {}
         // A slider is only drawn here: a click on it selects the item, like a click anywhere on an item.
         override val slidable: Boolean get() = false
+        // Nor can an item be picked up: Sections' rows are where the order changes.
+        override val draggable: Boolean get() = false
         override fun chevron(at: Rect) { expanded = !expanded }
         override fun chevronContext(at: Rect) { expanded = !expanded }
         override fun hover(inside: Boolean) {}
         override fun placed(id: String, at: Rect) {}
-    }
+    } }
     Column {
         BoxWithConstraints(
             Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(18.dp))
@@ -323,7 +322,7 @@ private fun SectionCard(section: Section, title: String, help: String, all: List
         modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp).onGloballyPositioned { reorder.cards[section] = it }) {
         // The card grows and shrinks smoothly as a dragged row's opening comes and goes.
         Column(Modifier.animateContentSize().padding(vertical = 12.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp).semantics { heading() })
             Text(help, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp))
             Spacer(Modifier.height(6.dp))
@@ -389,7 +388,7 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
                     }
                 }
                 .clickable(enabled = type != null) { onSelect(item.id) }.pointerHoverIcon(PointerIcon.Hand)
-                .semantics { customActions = actions }
+                .semantics { customActions = actions; this.selected = selected }
                 .padding(start = 2.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

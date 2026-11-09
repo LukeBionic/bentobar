@@ -32,13 +32,10 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,6 +44,8 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import com.meridian11.books.bentobar.R
 import com.meridian11.books.bentobar.bar.BarService
 import com.meridian11.books.bentobar.bar.BarStatus
@@ -59,10 +58,19 @@ import com.meridian11.books.bentobar.items.Ticker
 import com.meridian11.books.bentobar.util.Sym
 import com.meridian11.books.bentobar.util.SymIcon
 
+/** The settings window's pages: what the rail shows and what the header says. A new page goes here and in [MainActivity]'s `when`. */
+enum class Page(val icon: String, @androidx.annotation.StringRes val label: Int, @androidx.annotation.StringRes val title: Int) {
+    BAR(Sym.WYSIWYG, R.string.nav_bar, R.string.page_bar),
+    ADD(Sym.ADD, R.string.nav_add, R.string.page_add),
+    LOOK(Sym.PALETTE, R.string.nav_look, R.string.page_look),
+    SETUP(Sym.TUNE, R.string.nav_setup, R.string.page_setup),
+    ABOUT(Sym.INFO, R.string.nav_about, R.string.page_about),
+}
+
 class MainActivity : ComponentActivity() {
     // Accessibility services turned on or off (in Settings' own window, on a Googlebook).
     private val services = AccessibilityManager.AccessibilityServicesStateChangeListener { Setup.refresh(this) }
-    private var page by mutableIntStateOf(0)
+    private var page by mutableStateOf(Page.BAR)
     private var selected by mutableStateOf<String?>(null)
     /** The accessibility disclosure is up ([AccessibilityDisclosure]). */
     private var disclosure by mutableStateOf(false)
@@ -81,7 +89,7 @@ class MainActivity : ComponentActivity() {
             // use, not behind a page someone has to find. Once answered, only Turn on brings it back.
             disclosure = ConsentRules.asksOnFirstOpening(Store.consent.value, { serviceOn(this) }, { turnedOn(this) }, { Env.advancedProtection() })
         } else {
-            page = savedInstanceState.getInt(STATE_PAGE); selected = savedInstanceState.getString(STATE_SELECTED)
+            page = Page.entries.getOrElse(savedInstanceState.getInt(STATE_PAGE)) { Page.BAR }; selected = savedInstanceState.getString(STATE_SELECTED)
             disclosure = savedInstanceState.getBoolean(STATE_DISCLOSURE)
         }
         setContent {
@@ -101,7 +109,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putInt(STATE_PAGE, page)
+        outState.putInt(STATE_PAGE, page.ordinal)
         outState.putString(STATE_SELECTED, selected)
         outState.putBoolean(STATE_DISCLOSURE, disclosure)
     }
@@ -117,12 +125,12 @@ class MainActivity : ComponentActivity() {
 
     private fun handle(intent: Intent?) {
         intent ?: return
-        intent.getStringExtra(EXTRA_ITEM)?.let { selected = it; page = 0 }
-        if (intent.getBooleanExtra(EXTRA_EDIT, false)) page = 0
+        intent.getStringExtra(EXTRA_ITEM)?.let { selected = it; page = Page.BAR }
+        if (intent.getBooleanExtra(EXTRA_EDIT, false)) page = Page.BAR
         // A permission's prompt is asked for in this process ([requestPermission]), never named by an intent: this activity is
         // exported, so any app could send one, and the prompt would be BentoBar's.
         takeAsked()?.let { perm -> if (checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(perm), 1) }
-        if (intent.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") page = 2
+        if (intent.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") page = Page.LOOK
     }
 
     override fun onDestroy() {
@@ -189,21 +197,19 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(com.meridian11.books.bentobar.R.drawable.ic_bentobar), contentDescription = stringResource(R.string.app_name),
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(30.dp))
                 Spacer(Modifier.height(20.dp))
-                val pages = listOf(Sym.WYSIWYG to R.string.nav_bar, Sym.ADD to R.string.nav_add, Sym.PALETTE to R.string.nav_look,
-                    Sym.TUNE to R.string.nav_setup, Sym.INFO to R.string.nav_about)
-                pages.forEachIndexed { i, (icon, label) ->
-                    NavigationRailItem(selected = page == i, onClick = { page = i },
-                        icon = { SymIcon(icon, size = 22.sp, filled = page == i) }, label = { Text(stringResource(label)) })
+                Page.entries.forEach { p ->
+                    NavigationRailItem(selected = page == p, onClick = { page = p },
+                        icon = { SymIcon(p.icon, size = 22.sp, filled = page == p) }, label = { Text(stringResource(p.label)) })
                 }
             }
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 Row(Modifier.fillMaxWidth().padding(start = 28.dp, end = 20.dp, top = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(stringResource(listOf(R.string.page_bar, R.string.page_add, R.string.page_look, R.string.page_setup, R.string.page_about)[page]),
-                            style = MaterialTheme.typography.headlineSmall)
+                        Text(stringResource(page.title),
+                            style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
                         // Says what the strip is actually doing, not just whether the service is on.
                         Text(stringResource(when {
-                            !running -> if (page == 3) R.string.status_service_off_setup else R.string.status_service_off
+                            !running -> if (page == Page.SETUP) R.string.status_service_off_setup else R.string.status_service_off
                             !cfg.enabled -> R.string.status_hidden
                             else -> when (status) {
                                 BarStatus.STOPPED -> R.string.status_starting
@@ -225,10 +231,12 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxWidth()) {
+                    // Before the pages: a message is seen only by someone already listening, and BarPage's Undo posts as it opens.
+                    val snackbar = rememberNotices()
                     when (page) {
-                        0 -> BarPage(running, selected, onSelect = { selected = it }, onSetup = { page = 3 })
+                        Page.BAR -> BarPage(running, selected, onSelect = { selected = it }, onSetup = { page = Page.SETUP })
                         // Adding keeps you on Add: a message confirms it, with Undo, instead of jumping pages.
-                        1 -> AddPage { id ->
+                        Page.ADD -> AddPage { id ->
                             val added = Store.config.value.items.firstOrNull { it.id == id }
                             val type = added?.let { Items.of(it.type) }
                             val title = type?.title.orEmpty()
@@ -237,16 +245,11 @@ class MainActivity : ComponentActivity() {
                             Notice.post(if (rule != null) getString(R.string.add_added_rule, title, rule) else getString(R.string.add_added, title),
                                 getString(R.string.bar_undo)) { Store.remove(id) }
                         }
-                        2 -> LookPage()
-                        3 -> SetupPage(this@MainActivity, setup, onTurnOn = ::turnOn)
-                        else -> AboutPage()
+                        Page.LOOK -> LookPage()
+                        Page.SETUP -> SetupPage(this@MainActivity, setup, onTurnOn = ::turnOn)
+                        Page.ABOUT -> AboutPage()
                     }
-                    val snackbar = androidx.compose.runtime.remember { SnackbarHostState() }
-                    androidx.compose.runtime.LaunchedEffect(Unit) {
-                        Notice.messages.collect { m ->
-                            if (snackbar.showSnackbar(m.text, m.action, duration = androidx.compose.material3.SnackbarDuration.Long) == SnackbarResult.ActionPerformed) m.onAction?.invoke()
-                        }
-                    }
+                    // Last, so it's drawn over the page (in a Box, later children are on top).
                     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
                 }
             }
