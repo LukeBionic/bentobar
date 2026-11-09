@@ -170,7 +170,7 @@ BentoBar never reads what is in another app's window and doesn't watch your keyb
   minutes while the bar is on screen, and when you open its menu or press Refresh. Its readings are
   kept in memory only. Weather's switch in Setup › Online services covers it too.
 - **Exchange rates** asks [Frankfurter](https://frankfurter.dev) for the European Central Bank's
-  reference table of currencies, at most once an hour while the bar is on screen, and when you open
+  reference table of currencies, about once an hour while the bar is on screen (a failed try is repeated sooner), and when you open
   its menu or press Refresh. No key is needed, and the pairs you follow and the converter's amounts are
   worked out on the device. Frankfurter sees your IP address, as any website does.
 - **Flight** sends [AirLabs](https://airlabs.co) the flight number and your own AirLabs key: when you
