@@ -21,6 +21,7 @@ import android.view.MotionEvent
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -190,12 +191,14 @@ class BarController(private val service: AccessibilityService) {
         }
     }
     private var lastFullScan = 0L
+    /** The desktop bar's spacer node at the last scan: refreshing just this is a cheap "did anything move?" check. */
+    private var spacerNode: AccessibilityNodeInfo? = null
     /** The app windows against the bar's lower edge and under the bar, as [check] last saw them. */
     private var neighbours = BarNeighbours()
 
     private fun lightCheck() {
         val s = snap ?: return scan()
-        val node = s.spacerNode
+        val node = spacerNode
         // A bar without the DesktopStatusBarSpacer node has nothing cheap to re-check: a full scan
         // (with clearCache) every 2 s is costly, so between full scans only the window list is read.
         if (node == null) return if (SystemClock.uptimeMillis() - lastFullScan > 10_000) scan() else check(full = false)
@@ -203,7 +206,7 @@ class BarController(private val service: AccessibilityService) {
         // Against the spacer's own last bounds: with the spacer squeezed to nothing, the free area is
         // the widest gap instead, and comparing with that would run a full scan every time.
         val r = Rect().also { node.getBoundsInScreen(it) }
-        if (r != s.spacer) scan()
+        if (r.box() != s.spacer) scan()
     }
     private val expandOnHover = Runnable { if (hovering) expanded.value = true }
     private val collapse: Runnable = object : Runnable {
@@ -334,9 +337,12 @@ class BarController(private val service: AccessibilityService) {
         val inset = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top
         val maxH = (if (inset > 0) inset else (48 * density).toInt()) + 4
         val windows = runCatching { service.windows }.getOrDefault(emptyList())
-        overlayIds = windows.filter { it.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }.map { it.id }.toSet()
-        val barWindow = StatusBarScan.findWindow(windows, screenW, maxH)
-        val barBounds = barWindow?.let { Rect().also { r -> it.getBoundsInScreen(r) } }
+        // Plain facts from here on: what kind each window is and where, and nothing of what is in it.
+        val listed = windows.map { StatusBarScan.fact(it) }
+        overlayIds = listed.filter { it.kind == WindowFact.Kind.OVERLAY }.map { it.id }.toSet()
+        val barFact = BarRules.findBar(listed, screenW, maxH)
+        val barWindow = barFact?.let { windows[listed.indexOf(it)] }
+        val barBounds = barFact?.box
         val prev = snap
         val s = when {
             barWindow == null -> null
@@ -345,12 +351,15 @@ class BarController(private val service: AccessibilityService) {
                 lastFullScan = SystemClock.uptimeMillis()
                 // Without content-change events the node cache can go stale: read the status bar fresh.
                 service.clearCache()
-                runCatching { StatusBarScan.scan(barWindow) }.onFailure { Log.w(tag, "scan failed", it) }.getOrNull()
-                    // No node tree (SystemUI mid-change): the whole bar would cover its icons. Keep the last
-                    // reading of this same bar (without its cached node); with none, stay hidden until a scan can read it.
-                    ?.let { if (it.summary != StatusBarScan.NO_TREE) it else prev?.takeIf { p -> p.windowId == it.windowId && p.bar == it.bar }?.copy(spacerNode = null) }
+                val scanned = runCatching { StatusBarScan.scan(barWindow) }.onFailure { Log.w(tag, "scan failed", it) }.getOrNull()
+                // A reading kept from before has no node (a scan without a tree brought none).
+                spacerNode = scanned?.spacerNode
+                // No node tree (SystemUI mid-change): the whole bar would cover its icons. Keep the last
+                // reading of this same bar (without its cached node); with none, stay hidden until a scan can read it.
+                scanned?.snapshot?.let { if (it.summary != BarRules.NO_TREE) it else prev?.takeIf { p -> p.windowId == it.windowId && p.bar == it.bar } }
             }
         }
+        if (s == null) spacerNode = null
         val newWindow = s?.windowId != snap?.windowId
         snap = s
         val cfg = Store.config.value
@@ -362,7 +371,7 @@ class BarController(private val service: AccessibilityService) {
         // vanish for the seconds the preview shows.
         val cover = if (s == null) null else windows.firstOrNull { w ->
             val r = Rect().also { w.getBoundsInScreen(it) }
-            w.type == AccessibilityWindowInfo.TYPE_SYSTEM && w.id != s.windowId && Rect.intersects(r, s.free) &&
+            w.type == AccessibilityWindowInfo.TYPE_SYSTEM && w.id != s.windowId && Rect.intersects(r, s.free.rect()) &&
                 r.height() >= s.bar.height() * 4 && w.title?.contains("Screenshot", ignoreCase = true) != true
         }
         val covered = cover != null
@@ -529,7 +538,7 @@ class BarController(private val service: AccessibilityService) {
         } finally { hb.close() }
         bmp ?: return null
         try {
-            val area = Rect(s.clock ?: s.bar).apply { offset(-s.bar.left, -s.bar.top) }
+            val area = (s.clock ?: s.bar).rect().apply { offset(-s.bar.left, -s.bar.top) }
             // A clock box outside the picture (the bar changed size since the scan): read all of it.
             if (!area.intersect(0, 0, bmp.width, bmp.height)) area.set(0, 0, bmp.width, bmp.height)
             val px = IntArray(area.width() * area.height())
