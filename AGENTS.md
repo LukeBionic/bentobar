@@ -71,8 +71,11 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   - `bar/Menus.kt`: the popup's surface (`MenuSurface`: glass, clip to the shown glass, text colour) and its shadow
     (`MenuShadow`), the right-click item menu and the ‹ menu.
   - `items/`: `ItemType` + `ItemState`, `Items` registry + `Ticker` (1 Hz while anything is
-    visible; `Ticker.guarded`, on the pure `ItemGuard`, is the one way a type's own code is run for input or sampling),
-    `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,
+    visible, `Ticker` being the pure `TickLoop` on the app's `Wiring`; `Ticker.guarded`, on the pure `ItemGuard`, is the one
+    way a type's own code is run for input or sampling). A new item is one file and one line in `Items.all`: the type states
+    its `group` (Add lists it), whether it `holds` and `presents` and what it `samples`, and `ItemCatalogTest` fails for
+    whatever else was forgotten (a `Setup` row, a line in About). `TimerClock` is the timer's rules, pure, likewise, and
+    `Timers` runs it on Android. `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,
     glyph icons, `Chips` for the Live Update chip), `TextRules` (text from a layout or a reply as one line,
     counted as a reader counts it), and the item types: several each in
     `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own
@@ -102,7 +105,11 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     Off and something that shows items is on screen, and never runs on the main thread. A query can
     hold a key: a `Request` prints as host and path only, and no exception leaves `HttpTransport`.
   - `data/`: `Model.kt` (`BarConfig`, `ItemConfig`, `Section`…) and `Store` (JSON in
-    SharedPreferences, a process-wide StateFlow shared by the service and settings). `Online.kt`
+    SharedPreferences, a process-wide StateFlow shared by the service and settings; `Store.open` takes a `Prefs`, so a test
+    runs it on a map). `Layout.kt` holds `readLayout`, the one reader of a stored or pasted layout: decode, migrate, repeated
+    ids dropped; a layout from a newer version (`LAYOUT_VERSION`) is refused, never clamped, and kept for Backup to offer.
+    A schema change adds a file to `test/resources/layouts` (write-once, `LayoutFixturesTest`). Consent lives in a
+    no-backup file (`Store.loadConsent`). `Online.kt`
     holds what belongs to one install and never travels: whether each online service is switched on
     and the user's own key for one, in a file in Android's no-backup directory (so in no backup, no
     device transfer and no copied layout). `Kept.kt` keeps small texts there too (a service's last
@@ -355,7 +362,9 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   and network ticking. The manifest is `profileable` by the shell for simpleperf.
 - **What the strip draws and what the ticker samples are one rule** (`BarConfig.couldShow`, built on
   `shows`). Two separate predicates drifted when Show everything became the default: hidden items were
-  drawn but never sampled, so a clock froze (`HiddenModeTest.everythingDrawnIsSampled`).
+  drawn but never sampled, so a clock froze (`HiddenModeTest.everythingDrawnIsSampled`). Presenting is in the same rule (by
+  each type's `presents`), and an item of a type this version doesn't know is in no list but the settings row that names it
+  as from a newer version, and stays in the layout.
 - **Time:** timers and keep awake store wall-clock times (they survive a restart) plus a `ClockAnchor`
   (elapsed realtime and the boot count), so a clock change moves the deadline with it instead of
   ending it early; the timer alarm is `ELAPSED_REALTIME_WAKEUP`, armed again in `Timers.init` (alarms
