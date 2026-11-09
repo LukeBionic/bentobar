@@ -51,6 +51,9 @@ class MenuCompositionTest {
     /** What is composed. Null between cases: a menu that goes can end what it staged (Flight's choice of flights), so it goes before the next is staged. */
     private var shown by mutableStateOf<Case?>(null)
 
+    /** The \u2039 menu's `everything` flag while it is composed; null otherwise. */
+    private var barMenu by mutableStateOf<Boolean?>(null)
+
     private object Host : MenuHost {
         override fun close() {}
         override fun openItemSettings(id: String) {}
@@ -73,6 +76,7 @@ class MenuCompositionTest {
         val items = layout()
         rule.setContent {
             val c = shown
+            barMenu?.let { all -> MenuSurface(300.dp, 2000.dp, null) { BentoBarMenu(Host, openItem = {}, hideBar = {}, everything = all) } }
             if (c != null) {
                 MenuSurface(c.type.menuWidthDp.dp, 2000.dp, null) {
                     if (c.context) ItemContextMenu(c.item.id, Host) {} else ItemMenu(c.item.id, Host)
@@ -93,6 +97,12 @@ class MenuCompositionTest {
             }
             compose(Case(type, item, null, context = true))
             type.debug(listOf("off"))
+        }
+        // The \u2039 menu, the one the shortcut opens, lists every item's row: a throw in any row ends the service too.
+        for (everything in listOf(false, true)) {
+            rule.runOnUiThread { shown = null; barMenu = everything }
+            rule.waitForIdle()
+            composed++
         }
         assertTrue("composed only $composed cases", composed > 100)
     }
