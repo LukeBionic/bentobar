@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.input.pointer.areAnyPressed
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isTertiaryPressed
@@ -829,6 +830,7 @@ private fun Modifier.slides(steps: Int, rtl: Boolean, onHeld: (Float?) -> Unit, 
         val track = SLIDER_TRACK.toPx()
         // The rules are SliderGesture's (unit-tested); this turns pointer events into its four calls.
         val gesture = SliderGesture(steps)
+        fun inside(c: androidx.compose.ui.input.pointer.PointerInputChange) = c.position.x >= 0 && c.position.y >= 0 && c.position.x <= size.width && c.position.y <= size.height
         fun say(l: Float) { holds(l); level(l, false) }
         fun end(how: SliderGesture.End) {
             holds(null)
@@ -842,9 +844,10 @@ private fun Modifier.slides(steps: Int, rtl: Boolean, onHeld: (Float?) -> Unit, 
             awaitPointerEventScope {
                 var pointer: androidx.compose.ui.input.pointer.PointerId? = null
                 var downX = 0f
+                var downY = 0f
                 var downAt = 0L
                 var lastAt = 0L
-                val longPress = viewConfiguration.longPressTimeoutMillis
+                var longPress = 0L
                 while (true) {
                     // A finger held still: the menu when the time is up, not when it lifts. The time counts from the press, not the last small move.
                     val e = if (gesture.holding) withTimeoutOrNull((downAt + longPress - lastAt).coerceAtLeast(0)) { awaitPointerEvent() } else awaitPointerEvent()
@@ -863,23 +866,26 @@ private fun Modifier.slides(steps: Int, rtl: Boolean, onHeld: (Float?) -> Unit, 
                             gesture.down -> e.changes.forEach { it.consume() }
                             // The primary button, a finger or a pen; a right or a middle click is the item's own.
                             !e.buttons.isSecondaryPressed && !e.buttons.isTertiaryPressed && !c.isConsumed -> {
-                                pointer = c.id; downX = c.position.x; downAt = c.uptimeMillis; lastAt = downAt
-                                // A finger may still be about to tap or to hold: nothing is set until it says which.
-                                gesture.press(at, follows = c.type != androidx.compose.ui.input.pointer.PointerType.Touch)?.let { say(it) }
+                                pointer = c.id; downX = c.position.x; downY = c.position.y; downAt = c.uptimeMillis; lastAt = downAt
+                                longPress = viewConfiguration.longPressTimeoutMillis // the system's setting, as it is now: a person can change it while the service runs
+                                // A finger may still be about to tap or to hold: nothing is set until it says which. A touchpad's press has a button, whatever its pointer claims.
+                                gesture.press(at, follows = !ClickGesture.isFinger(c.type == androidx.compose.ui.input.pointer.PointerType.Touch, e.buttons.areAnyPressed))?.let { say(it) }
                                 c.consume()
                             }
                         }
                         // A pressed mouse that crosses the zone's edge arrives as Exit or Enter: it has moved all the same.
                         PointerEventType.Move, PointerEventType.Enter, PointerEventType.Exit -> if (gesture.down) {
-                            if (c.pressed) gesture.move(at, kotlin.math.abs(c.position.x - downX) > viewConfiguration.touchSlop)?.let { say(it) }
+                            if (c.pressed) {
+                                val slop = viewConfiguration.touchSlop
+                                gesture.move(at, kotlin.math.abs(c.position.x - downX) > slop, strayed = kotlin.math.abs(c.position.y - downY) > slop || !inside(c))?.let { say(it) }
+                            }
                             c.consume()
                         }
                         PointerEventType.Release -> if (gesture.down && !c.pressed) {
                             // Taken away by the system, not lifted (such a change arrives consumed): what was set stays, nothing more is.
                             if (c.isConsumed) end(gesture.cancel())
                             else {
-                                val inside = c.position.x >= 0 && c.position.y >= 0 && c.position.x <= size.width && c.position.y <= size.height
-                                end(gesture.release(at, inside))
+                                end(gesture.release(at, inside(c)))
                                 c.consume()
                             }
                         }
@@ -909,7 +915,8 @@ private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll
     val takenAway by rememberUpdatedState(onDragTakenAway)
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     pointerInput(Unit) {
-        val gesture = ClickGesture(viewConfiguration.longPressTimeoutMillis, viewConfiguration.touchSlop)
+        val gesture = ClickGesture(viewConfiguration.touchSlop)
+        fun inside(c: androidx.compose.ui.input.pointer.PointerInputChange) = c.position.x >= 0 && c.position.y >= 0 && c.position.x <= size.width && c.position.y <= size.height
         fun act(did: ClickGesture.Did, downX: Float) = when (did) {
             ClickGesture.Did.Click -> click()
             ClickGesture.Did.Menu -> context()
@@ -933,19 +940,19 @@ private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll
                     val c = e.changes.firstOrNull()
                     when (e.type) {
                         PointerEventType.Press -> {
-                            gesture.press(e.changes.any { it.isConsumed }, e.buttons.isSecondaryPressed, c?.type == PointerType.Touch, c?.position?.x ?: 0f, c?.uptimeMillis ?: 0L)
+                            gesture.press(e.changes.any { it.isConsumed }, e.buttons.isSecondaryPressed, c?.type == PointerType.Touch, e.buttons.areAnyPressed,
+                                c?.position?.x ?: 0f, c?.position?.y ?: 0f, c?.uptimeMillis ?: 0L, viewConfiguration.longPressTimeoutMillis)
                             if (gesture.armed) e.changes.forEach { it.consume() }
                         }
                         PointerEventType.Move -> if (c != null) {
-                            val did = gesture.move(c.position.x, c.pressed, c.isConsumed, drag != null, c.uptimeMillis)
+                            val did = gesture.move(c.position.x, c.position.y, inside(c), c.pressed, c.isConsumed, drag != null, c.uptimeMillis)
                             if (did is ClickGesture.Did.Drag) { act(did, gesture.downX); c.consume() }
                         }
                         PointerEventType.Release -> if (c != null) {
                             val pressed = gesture.armed
                             val downX = gesture.downX
                             // Where it was let go: the pointer can travel past the last move event.
-                            val inside = c.position.x >= 0 && c.position.y >= 0 && c.position.x <= size.width && c.position.y <= size.height
-                            act(gesture.release(c.position.x, inside, c.isConsumed), downX)
+                            act(gesture.release(c.position.x, inside(c), c.isConsumed), downX)
                             if (pressed) e.changes.forEach { it.consume() }
                         }
                         PointerEventType.Scroll -> scroll?.let { onWheel ->

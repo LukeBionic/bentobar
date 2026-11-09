@@ -113,8 +113,10 @@ class SliderGesture(private val steps: Int) {
     /** The level follows the pointer. */
     var following = false; private set
     /** A finger is down that has not said yet what it is about: a hold is being waited for. */
-    val holding: Boolean get() = down && !following
+    val holding: Boolean get() = down && !following && !strayed
     private var moved = false
+    /** The finger went off the slider or across it, past the slop or out of its zone: it is no hold any more, and it may still lift as a tap. */
+    private var strayed = false
     /** The level under the pointer when it was last looked at, on its step; NaN: not looked at yet. */
     private var under = Float.NaN
     /** The last level reported; NaN: none yet. */
@@ -125,17 +127,20 @@ class SliderGesture(private val steps: Int) {
      * Returns the level to report, or null (a finger: nothing yet).
      */
     fun press(level: Float, follows: Boolean): Float? {
-        down = true; moved = false; following = follows; said = Float.NaN
+        down = true; moved = false; following = follows; strayed = false; said = Float.NaN
         under = if (follows) SliderMath.snap(level, steps) else Float.NaN
         return if (follows) say(SliderMath.atLeastOneStep(level, steps)) else null
     }
 
     /**
-     * The pointer moved and is over [level] now. [pastSlop]: it is far enough from where it went down
-     * for a finger to mean it. Returns a level to report, or null: only a new level is news.
+     * The pointer moved and is over [level] now. [pastSlop]: it is far enough along the track from where
+     * it went down for a finger to mean it. [strayed]: it has gone off the track past the slop, or out of
+     * the slider's zone, so a finger is no longer held still. Returns a level to report, or null: only a
+     * new level is news.
      */
-    fun move(level: Float, pastSlop: Boolean): Float? {
+    fun move(level: Float, pastSlop: Boolean, strayed: Boolean = false): Float? {
         if (!down) return null
+        if (strayed) this.strayed = true
         if (!following && pastSlop) following = true
         if (!following) return null
         val l = SliderMath.snap(level, steps)

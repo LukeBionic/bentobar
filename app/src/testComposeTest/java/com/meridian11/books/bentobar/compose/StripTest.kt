@@ -3,7 +3,10 @@ package com.meridian11.books.bentobar.compose
 import android.app.Application
 import android.graphics.Rect
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -80,13 +83,22 @@ class StripTest {
 
     @Before fun env() = Env.init(ApplicationProvider.getApplicationContext<Application>())
 
-    private fun strip(items: List<StripEntry>, maxWidth: Int = 2000, chevron: Boolean = false, onOverflow: (Set<String>) -> Unit = {}, direction: LayoutDirection? = null) {
+    /** The system's long-press time, which a person can change in Accessibility settings while the service runs. */
+    private class Timing(real: ViewConfiguration, var longPress: Long) : ViewConfiguration by real {
+        override val longPressTimeoutMillis get() = longPress
+    }
+
+    private fun strip(items: List<StripEntry>, maxWidth: Int = 2000, chevron: Boolean = false, onOverflow: (Set<String>) -> Unit = {}, direction: LayoutDirection? = null, timing: Long? = null): (Long) -> Unit {
+        var said: Timing? = null
         rule.setContent {
-            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides (direction ?: androidx.compose.ui.platform.LocalLayoutDirection.current)) {
+            val real = LocalViewConfiguration.current
+            val config = if (timing == null) real else remember { Timing(real, timing).also { said = it } }
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides (direction ?: androidx.compose.ui.platform.LocalLayoutDirection.current), LocalViewConfiguration provides config) {
                 Strip(items, emptyList(), showChevron = chevron, chevronAlways = false, chevronReservePx = 30, expanded = false, chevronOnLeft = true,
                     look = look, maxWidthPx = maxWidth, heightDp = 36.dp, events = events, onOverflow = onOverflow)
             }
         }
+        return { said!!.longPress = it }
     }
 
     @Test fun aPressOnAnItemIsAClickAndAMoveAlongTheStripIsADrag() {
@@ -134,6 +146,41 @@ class StripTest {
         rule.runOnIdle {
             assertEquals(listOf("a"), events.contexts)
             assertTrue(events.clicks.isEmpty())
+        }
+    }
+
+    @Test fun aChangedLongPressTimeTakesOnTheNextPress() {
+        val setTiming = strip(listOf(plain, sliderEntry), timing = 400)
+        fun holdFor(desc: String, at: androidx.compose.ui.test.TouchInjectionScope.() -> Offset, ms: Long) =
+            rule.onNodeWithContentDescription(desc).performTouchInput { down(at()); advanceEventTime(ms); up() }
+        val onItem: androidx.compose.ui.test.TouchInjectionScope.() -> Offset = { center }
+        val onTrack: androidx.compose.ui.test.TouchInjectionScope.() -> Offset = { centerRight - Offset(20f, 0f) }
+        holdFor("Alpha desc", onItem, 600)
+        holdFor("Volume", onTrack, 600)
+        rule.runOnIdle { assertEquals(listOf("a", "s"), events.contexts) }
+
+        // The setting went to Long while the item stayed on the strip. The same press is now too short to be a hold.
+        setTiming(1500)
+        holdFor("Alpha desc", onItem, 600)
+        holdFor("Volume", onTrack, 600)
+        rule.runOnIdle {
+            assertEquals("no menu at the old time", listOf("a", "s"), events.contexts)
+            assertEquals("a tap on the item", listOf("a"), events.clicks)
+            assertEquals("a tap on the slider", 1, events.slides.size)
+        }
+        holdFor("Alpha desc", onItem, 1600)
+        holdFor("Volume", onTrack, 1600)
+        rule.runOnIdle { assertEquals("the menu at the new time", listOf("a", "s", "a", "s"), events.contexts) }
+    }
+
+    @Test fun aFingerPulledDownOffTheItemIsNoHoldAndNothingComesOfIt() {
+        strip(listOf(plain, sliderEntry))
+        for (desc in listOf("Alpha desc", "Volume"))
+            rule.onNodeWithContentDescription(desc).performTouchInput { down(centerRight - Offset(20f, 0f)); moveBy(Offset(0f, 300f)); advanceEventTime(1000); up() }
+        rule.runOnIdle {
+            assertTrue("no menu: ${events.contexts}", events.contexts.isEmpty())
+            assertTrue("no click: ${events.clicks}", events.clicks.isEmpty())
+            assertTrue("nothing set: ${events.slides}", events.slides.isEmpty())
         }
     }
 

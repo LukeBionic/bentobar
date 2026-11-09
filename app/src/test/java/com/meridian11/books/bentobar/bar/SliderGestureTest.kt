@@ -116,6 +116,16 @@ class SliderGestureTest {
         assertEquals(SliderGesture.End.None, g.release(0.5f, inside = true))
     }
 
+    @Test fun aFingerThatStraysOffTheSliderIsNoHoldAndSetsNothing() {
+        val g = SliderGesture(15)
+        g.press(0.5f, follows = false)
+        assertNull(g.move(0.5f, pastSlop = false, strayed = true))
+        assertFalse(g.holding)
+        assertFalse(g.following)
+        assertEquals(SliderGesture.End.None, g.held())
+        assertEquals(SliderGesture.End.None, g.release(0.5f, inside = false))
+    }
+
     @Test fun aFingerThatLiftsSomewhereElseSetsNothing() {
         val g = SliderGesture(15)
         g.press(0.5f, follows = false)
