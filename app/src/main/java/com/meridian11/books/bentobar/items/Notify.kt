@@ -150,7 +150,8 @@ object Chips {
         // Before build() reads it: a process just started finds it loading, and the load comes back here.
         if (meetings) Calendar.hold(CALENDAR_USER) else Calendar.release(CALENDAR_USER)
         val n = if (shows) build(app) else null
-        if (n == null) nm.cancel(Notify.ID_CHIP) else { Notify.channels(app); nm.notify(Notify.ID_CHIP, n) }
+        if (n != null) { Notify.channels(app); nm.notify(Notify.ID_CHIP, n) }
+        else if (!ChipRules.leaveUp(meetings, Calendar.loadingFirst) { showingTimeout(nm) }) nm.cancel(Notify.ID_CHIP)
         var next: Long? = null
         if (meetings) {
             // Keep the calendar current while the strip (which otherwise asks for it) may be away; a
@@ -177,6 +178,10 @@ object Chips {
         if (at == null) am.cancel(pi) else am.set(AlarmManager.RTC, at, pi)
         armedAt = at
     }
+
+    /** What the chip up now was posted with ([ChipRules.leaveUp]); null with none up. */
+    private fun showingTimeout(nm: NotificationManager) =
+        nm.activeNotifications.firstOrNull { it.id == Notify.ID_CHIP }?.notification?.timeoutAfter
 
     private fun meetingChips() =
         Store.config.value.items.any { it.type == EventItem.type && it.section != com.meridian11.books.bentobar.data.Section.OFF }
@@ -270,7 +275,12 @@ class ChipAction : BroadcastReceiver() {
             TOGGLE -> Timers.toggle()
             PLUS -> Timers.add(60_000)
             STOP -> Timers.stop()
-            BOUNDARY -> Chips.update(context)
+            BOUNDARY -> {
+                Chips.update(context)
+                // A process started for this alarm is cached as soon as this returns, with the first load still running and the
+                // next alarm not set. It stays a receiver until the load has come back through Chips.update, or a few seconds.
+                if (Calendar.loadingFirst) goAsync().let { Calendar.whenLoaded(it::finish) }
+            }
         }
     }
 }

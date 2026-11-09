@@ -35,6 +35,40 @@ class ChipRulesTest {
         assertEquals(1L, ChipRules.timeoutAfter(end = 1_000 * min, now = 2_000 * min))
     }
 
+    @Test fun aMeetingsChipStaysWhileTheCalendarsFirstLoadIsOnItsWay() {
+        // A process started by the alarm has read nothing yet, which says nothing about the meeting the chip is for.
+        assertTrue(ChipRules.leaveUp(meetings = true, firstLoadRunning = true) { 30 * min })
+    }
+
+    @Test fun oncePassedTheFirstLoadNothingToShowTakesTheChipDown() {
+        assertFalse("the load is back and found no meeting", ChipRules.leaveUp(meetings = true, firstLoadRunning = false) { 30 * min })
+        assertFalse("the chip can't be a meeting's now", ChipRules.leaveUp(meetings = false, firstLoadRunning = true) { 30 * min })
+    }
+
+    @Test fun aTimersChipIsNeverLeftUpForTheCalendar() {
+        // A timer that ended while the process was gone ends in Env.init, on this path, and its chip has no timeout: left up, nothing
+        // would ever take it down if the process went before the load came back.
+        assertFalse(ChipRules.leaveUp(meetings = true, firstLoadRunning = true) { 0L })
+    }
+
+    @Test fun noChipUpIsNothingToLeave() {
+        assertFalse(ChipRules.leaveUp(meetings = true, firstLoadRunning = true) { null })
+    }
+
+    @Test fun theSystemIsAskedWhatIsUpOnlyWhenThatDecidesIt() {
+        val asked = { throw AssertionError("asked") }
+        assertFalse(ChipRules.leaveUp(meetings = true, firstLoadRunning = false, asked))
+        assertFalse(ChipRules.leaveUp(meetings = false, firstLoadRunning = true, asked))
+    }
+
+    @Test fun theAlarmHoldsAFreshProcessUntilItHasReadTheCalendar() {
+        // Without it the process is cached as onReceive returns, the first load still running and the next alarm not set.
+        val notify = SourceScan.code(SourceScan.sources.single { it.name == "Notify.kt" })
+        assertTrue("goAsync()" in notify)
+        assertTrue(Regex("""Calendar\.loadingFirst""").containsMatchIn(notify))
+        assertTrue("ChipRules.leaveUp(" in notify)
+    }
+
     @Test fun theChipsBoundaryIsAnInexactAlarmAndTheCalendarLetsGoOfItsObserver() {
         val notify = SourceScan.code(SourceScan.sources.single { it.name == "Notify.kt" })
         assertTrue(".setTimeoutAfter(" in notify)

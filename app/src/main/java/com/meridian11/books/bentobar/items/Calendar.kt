@@ -55,13 +55,16 @@ object Calendar {
     private val main by lazy { Handler(Looper.getMainLooper()) }
     /** Who needs the calendar: the two item types while they are sampled, and the Live Update chip, which needs meetings while the service is off. Nobody: no observer, nothing loaded, nothing kept. */
     private val users = Holders(KEPT_AFTER_LAST_USER_MS, { ms, r -> main.postDelayed(r, ms) }, { main.removeCallbacks(it) }, start = { refresh() }, stop = ::letGo)
+    /** How long [whenLoaded] waits at most: time for a read of 41 days, and well inside what Android gives a broadcast receiver. */
+    private const val LOAD_WAIT_MS = 5_000L
+    private val waiting = Waiters(LOAD_WAIT_MS, { ms, r -> main.postDelayed(r, ms) }, { main.removeCallbacks(it) })
     /**
      * Calendar's loading is [Refresher]'s, one load at a time and one snapshot, but on a wiring of its own: `Background`'s
      * stops loading while nothing shows items, and the Live Update chip needs meetings while the service is off.
      */
     private val loader = calendarLoader(
         Refresher.Wiring(Background.executor("calendar"), { Background.onMain(it::run) }, Now::elapsed,
-            changed = { Chips.update(app); loaded() }, minGapMs = 0, mayLoad = { users.active && allowed() }),
+            changed = { Chips.update(app); loaded(); waiting.arrived() }, minGapMs = 0, mayLoad = { users.active && allowed() }),
     ) { load(System.currentTimeMillis()).takeIf { allowed() } }
     val events: List<Event> get() = loader.peek(Unit).orEmpty()
     private var observer: ContentObserver? = null
@@ -74,6 +77,12 @@ object Calendar {
 
     /** [who] doesn't any more. Main thread. */
     fun release(who: String) = users.release(who)
+
+    /** Nothing has been read yet and the first load is on its way. Main thread. */
+    val loadingFirst: Boolean get() = loader.loadingFirst()
+
+    /** [done] runs when what is being loaded has come back, or after a few seconds if it doesn't say so. Main thread. */
+    fun whenLoaded(done: () -> Unit) = waiting.add(done)
 
     fun allowed() = ::app.isInitialized && app.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
         Uses.on(Uses.CALENDAR)
@@ -259,3 +268,6 @@ object Calendar {
  */
 internal fun calendarLoader(wiring: Refresher.Wiring, load: () -> List<Calendar.Event>?): Refresher<Unit, List<Calendar.Event>> =
     Refresher(wiring, every = { _, _ -> Calendar.RELOAD_MS }, load = { _, _ -> load() })
+
+/** The load under way is the first: nothing has been read yet, so finding no meeting would only mean not knowing. */
+internal fun Refresher<Unit, List<Calendar.Event>>.loadingFirst(): Boolean = loading(Unit) && peek(Unit) == null

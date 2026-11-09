@@ -49,6 +49,17 @@ class CalendarLoaderTest {
         assertEquals(null, loader.peek(Unit))
     }
 
+    @Test fun onlyAFirstLoadMeansNothingIsKnownYet() {
+        assertFalse(loader.loadingFirst())
+        loader.want(Unit)
+        assertTrue("the first load is on its way", loader.loadingFirst())
+        run()
+        assertFalse("something has been read", loader.loadingFirst())
+        assertTrue(loader.refresh(Unit, afterRunning = true))
+        assertFalse("a reload still has the last reading", loader.loadingFirst())
+        run()
+    }
+
     @Test fun aBurstOfProviderChangesQueuesOneMoreLoadNotHundreds() {
         loader.want(Unit) // the first load is running
         repeat(300) { loader.refresh(Unit, afterRunning = true) }
