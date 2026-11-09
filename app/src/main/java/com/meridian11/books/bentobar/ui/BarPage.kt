@@ -97,9 +97,6 @@ import com.meridian11.books.bentobar.data.Display
 import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Position
 import com.meridian11.books.bentobar.data.Section
-import com.meridian11.books.bentobar.data.shows
-import com.meridian11.books.bentobar.data.behindChevron
-import com.meridian11.books.bentobar.data.sectionShows
 import com.meridian11.books.bentobar.data.HiddenMode
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.data.hide
@@ -108,6 +105,7 @@ import com.meridian11.books.bentobar.data.setWhenActive
 import com.meridian11.books.bentobar.data.show
 import com.meridian11.books.bentobar.data.turnOff
 import com.meridian11.books.bentobar.data.spacingDp
+import com.meridian11.books.bentobar.data.stripPlan
 import com.meridian11.books.bentobar.items.ItemState
 import com.meridian11.books.bentobar.items.Items
 import com.meridian11.books.bentobar.items.Ticker
@@ -201,9 +199,11 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
     val cfg by Store.config.collectAsState()
     val tick by Ticker.tick.collectAsState()
     var expanded by remember { mutableStateOf(false) }
-    // The layout being edited, presenting or not; a type this version doesn't know draws nothing, here as in the strip.
-    val visible = cfg.items.filter { Items.of(it.type) != null && cfg.sectionShows(it, states[it.id]?.active == true) }
-    val hidden = cfg.behindChevron { states[it.id]?.active == true }
+    // The preview is narrower than a status bar: what it has no room for is said under it, or an item
+    // that is in the list and not in the picture looks lost.
+    var dropped by remember { mutableStateOf(emptySet<String>()) }
+    // What the bar shows, by the same function: the preview makes no choice of its own.
+    val plan = cfg.stripPlan({ states[it.id]?.active == true }, expanded, dropped.isNotEmpty())
     val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.placeholder(it)) } }
     // The preview uses the strip's real colours: the sampled bar when BentoBar is running and the
     // colour is automatic, else the forced Light or Dark choice.
@@ -230,9 +230,6 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
         override fun hover(inside: Boolean) {}
         override fun placed(id: String, at: Rect) {}
     }
-    // The preview is narrower than a status bar: what it has no room for is said under it, or an item
-    // that is in the list and not in the picture looks lost.
-    var dropped by remember { mutableStateOf(emptySet<String>()) }
     Column {
         BoxWithConstraints(
             Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(18.dp))
@@ -247,8 +244,8 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
                 Text(Dates.format(Dates.timeSkeleton(h24), now) + "   " + Dates.format("EEEMMMd", now), color = look.fg,
                     fontFamily = Fonts.bar, fontWeight = Fonts.barWeight, fontSize = 14.sp)
                 if (cfg.position == Position.LEFT) Spacer(Modifier.width(16.dp)) else Spacer(Modifier.weight(1f))
-                Strip(entries(visible), if (expanded) entries(hidden) else emptyList(), hidden.isNotEmpty(),
-                    chevronAlways = hidden.isNotEmpty(), chevronReservePx = 0, expanded = expanded,
+                Strip(entries(plan.visible), entries(plan.revealed), plan.chevron,
+                    chevronAlways = plan.chevronAlways, chevronReservePx = 0, expanded = plan.open,
                     chevronOnLeft = cfg.position != Position.LEFT, look = look, maxWidthPx = maxPx, heightDp = 52.dp, events = events,
                     onOverflow = { dropped = it })
                 if (cfg.position == Position.LEFT) Spacer(Modifier.weight(1f)) else if (cfg.position == Position.CENTER) Spacer(Modifier.weight(1f))
@@ -261,7 +258,7 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
                 }
             }
         }
-        val hint = stringResource(if (hidden.isNotEmpty()) R.string.bar_preview_hint_hidden else R.string.bar_preview_hint)
+        val hint = stringResource(if (plan.hidden.isNotEmpty()) R.string.bar_preview_hint_hidden else R.string.bar_preview_hint)
         Text(if (dropped.isEmpty()) hint else hint + " " + pluralStringResource(R.plurals.bar_preview_more, dropped.size, dropped.size),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 6.dp, top = 6.dp))

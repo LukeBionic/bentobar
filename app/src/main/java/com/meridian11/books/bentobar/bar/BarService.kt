@@ -29,7 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.meridian11.books.bentobar.data.HiddenMode
-import com.meridian11.books.bentobar.data.shows
+import com.meridian11.books.bentobar.data.stripPlan
 import com.meridian11.books.bentobar.data.behindChevron
 import com.meridian11.books.bentobar.data.moved
 import com.meridian11.books.bentobar.data.ItemConfig
@@ -435,20 +435,12 @@ class BarController(private val service: AccessibilityService) {
         val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.placeholder(it)) } }
         // While dragging, the bar shows the order the item would land in.
         val items = dragPreview.value?.let { (id, at) -> cfg.items.moved(id, Section.SHOWN, at) } ?: cfg.items
-        val visible = items.filter { cfg.shows(it, states[it.id]?.active == true) }
-            // Next meeting stays at the far left: its text changes width most, and there it moves nothing else.
-            .sortedBy { if (it.type == Store.PINNED_LEFT) 0 else 1 }
-        // Behind ‹ (click or hover modes): hidden items not out on their own. Show everything: none.
-        val hidden = if (cfg.presenting) emptyList() else cfg.behindChevron { states[it.id]?.active == true }
         val overflow by BarOverflow.ids.collectAsState()
-        // Without the ‹ button there's no way to fold hidden items back, so they stay folded.
-        val open = expanded.value && cfg.hiddenMode != HiddenMode.SHOW_ALL && !cfg.presenting
-        val shownEntries = entries(visible)
-        val revealedEntries = if (open) entries(hidden) else emptyList()
-        // Items that don't fit are offered in the ‹ menu, so ‹ shows for them too.
-        val showChevron = cfg.presenting || overflow.isNotEmpty() || hidden.isNotEmpty()
+        val plan = cfg.copy(items = items).stripPlan({ states[it.id]?.active == true }, expanded.value, overflow.isNotEmpty())
+        val shownEntries = entries(plan.visible)
+        val revealedEntries = entries(plan.revealed)
         // The one rule for an empty strip: what it puts on the screen, never how many entries it has.
-        val drawn = StripContent.drawn(shownEntries + revealedEntries, showChevron, look.value.pill)
+        val drawn = StripContent.drawn(shownEntries + revealedEntries, plan.chevron, look.value.pill)
         // While the window is invisible nothing draws, and the remeasure Compose hands to the next draw would wait for it for
         // good. Measuring still runs, if it is asked for: the rule above is heard as soon as the composition changes.
         val view = LocalView.current
@@ -458,10 +450,10 @@ class BarController(private val service: AccessibilityService) {
             Strip(
                 visible = shownEntries,
                 revealed = revealedEntries,
-                showChevron = showChevron,
-                chevronAlways = cfg.presenting || hidden.isNotEmpty(),
+                showChevron = plan.chevron,
+                chevronAlways = plan.chevronAlways,
                 chevronReservePx = (30 * density).toInt(),
-                expanded = open,
+                expanded = plan.open,
                 chevronOnLeft = cfg.position != Position.LEFT,
                 look = look.value,
                 maxWidthPx = maxWidth.intValue,

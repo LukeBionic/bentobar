@@ -208,7 +208,7 @@ fun BarConfig.shows(item: ItemConfig, active: Boolean, type: ItemType? = Items.o
     else -> sectionShows(item, active)
 }
 
-/** What [item]'s section says, presenting aside: the layout as it is edited, which the settings preview shows and the ‹ lists go by. */
+/** What [item]'s section says, presenting aside: the layout as it is edited, which the ‹ lists go by. */
 fun BarConfig.sectionShows(item: ItemConfig, active: Boolean): Boolean = when (item.section) {
     Section.SHOWN -> true
     Section.HIDDEN -> if (hiddenMode == HiddenMode.SHOW_ALL) !item.whenActive || active else item.whenActive && active
@@ -231,3 +231,40 @@ fun BarConfig.notDrawn(active: (ItemConfig) -> Boolean): List<ItemConfig> =
 
 /** Whether [shows] can be true for [item] once it has something to say: the items worth sampling. */
 fun BarConfig.couldShow(item: ItemConfig, type: ItemType? = Items.of(item.type)): Boolean = shows(item, active = true, type)
+
+/**
+ * What the strip shows of a layout right now: what the bar draws and the settings preview draws, from one place, so a new
+ * strip rule is made once ([stripPlan]).
+ */
+data class StripPlan(
+    /** The items drawn, in the strip's order. */
+    val visible: List<ItemConfig>,
+    /** The items waiting behind ‹. */
+    val hidden: List<ItemConfig>,
+    /** ‹ is open and [hidden] are out. */
+    val open: Boolean,
+    /** ‹ is drawn. */
+    val chevron: Boolean,
+    /** ‹ is drawn whatever fits, so its room is always kept. */
+    val chevronAlways: Boolean,
+) {
+    /** What [open] puts next to [visible]. */
+    val revealed: List<ItemConfig> get() = if (open) hidden else emptyList()
+}
+
+/**
+ * The strip's one choice of what to show, for the bar and the settings preview alike. [active]: whether an item has something
+ * to say. [expanded]: ‹ was opened. [overflow]: items didn't fit, and are offered behind ‹ (a preview, narrower than a bar,
+ * has its own). Next meeting stays at the far left: its text changes width most, and there it moves nothing else.
+ */
+fun BarConfig.stripPlan(active: (ItemConfig) -> Boolean, expanded: Boolean, overflow: Boolean): StripPlan {
+    val visible = items.filter { shows(it, active(it)) }.sortedBy { if (it.type == Store.PINNED_LEFT) 0 else 1 }
+    val hidden = if (presenting) emptyList() else behindChevron(active)
+    return StripPlan(
+        visible, hidden,
+        // Show everything has no ‹ to fold them back with, and presenting's ‹ only opens the menu.
+        open = expanded && hiddenMode != HiddenMode.SHOW_ALL && !presenting,
+        chevron = presenting || overflow || hidden.isNotEmpty(),
+        chevronAlways = presenting || hidden.isNotEmpty(),
+    )
+}
