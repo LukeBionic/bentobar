@@ -102,6 +102,11 @@ import com.meridian11.books.bentobar.data.behindChevron
 import com.meridian11.books.bentobar.data.sectionShows
 import com.meridian11.books.bentobar.data.HiddenMode
 import com.meridian11.books.bentobar.data.Store
+import com.meridian11.books.bentobar.data.hide
+import com.meridian11.books.bentobar.data.putIn
+import com.meridian11.books.bentobar.data.setWhenActive
+import com.meridian11.books.bentobar.data.show
+import com.meridian11.books.bentobar.data.turnOff
 import com.meridian11.books.bentobar.data.spacingDp
 import com.meridian11.books.bentobar.items.ItemState
 import com.meridian11.books.bentobar.items.Items
@@ -364,9 +369,9 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
     val actions = buildList {
         if (index > 0) add(CustomAccessibilityAction(moveUp) { move(index - 1); true })
         if (index < count - 1) add(CustomAccessibilityAction(moveDown) { move(index + 1); true })
-        if (item.section != Section.SHOWN) add(CustomAccessibilityAction(toShown) { Store.move(item.id, Section.SHOWN, 999); true })
-        if (item.section != Section.HIDDEN) add(CustomAccessibilityAction(toHidden) { Store.move(item.id, Section.HIDDEN, 999); true })
-        if (item.section != Section.OFF) add(CustomAccessibilityAction(turnOff) { Store.move(item.id, Section.OFF, 999); true })
+        if (item.section != Section.SHOWN) add(CustomAccessibilityAction(toShown) { Store.update { it.show(item.id) }; true })
+        if (item.section != Section.HIDDEN) add(CustomAccessibilityAction(toHidden) { Store.update { it.hide(item.id) }; true })
+        if (item.section != Section.OFF) add(CustomAccessibilityAction(turnOff) { Store.update { it.turnOff(item.id) }; true })
     }
     val grab = remember { PointerIcon(android.view.PointerIcon.TYPE_GRAB) }
     Row(
@@ -405,11 +410,11 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
                     leadingIcon = { SymIcon(Sym.ARROW_UPWARD, size = 18.sp) })
                 if (index < count - 1) DropdownMenuItem(text = { Text(moveDown) }, onClick = { menu = false; move(index + 1) },
                     leadingIcon = { SymIcon(Sym.ARROW_DOWNWARD, size = 18.sp) })
-                if (item.section != Section.SHOWN) DropdownMenuItem(text = { Text(toShown) }, onClick = { menu = false; Store.move(item.id, Section.SHOWN, 999) },
+                if (item.section != Section.SHOWN) DropdownMenuItem(text = { Text(toShown) }, onClick = { menu = false; Store.update { it.show(item.id) } },
                     leadingIcon = { SymIcon(Sym.VISIBILITY, size = 18.sp) })
-                if (item.section != Section.HIDDEN) DropdownMenuItem(text = { Text(stringResource(R.string.section_hidden)) }, onClick = { menu = false; Store.move(item.id, Section.HIDDEN, 999) },
+                if (item.section != Section.HIDDEN) DropdownMenuItem(text = { Text(stringResource(R.string.section_hidden)) }, onClick = { menu = false; Store.update { it.hide(item.id) } },
                     leadingIcon = { SymIcon(Sym.VISIBILITY_OFF, size = 18.sp) })
-                if (item.section != Section.OFF) DropdownMenuItem(text = { Text(turnOff) }, onClick = { menu = false; Store.move(item.id, Section.OFF, 999) },
+                if (item.section != Section.OFF) DropdownMenuItem(text = { Text(turnOff) }, onClick = { menu = false; Store.update { it.turnOff(item.id) } },
                     leadingIcon = { SymIcon(Sym.REMOVE, size = 18.sp) })
                 DropdownMenuItem(text = { Text(stringResource(R.string.common_delete)) }, onClick = { menu = false; if (selected) onSelect(null); Undo.delete(item) },
                     leadingIcon = { SymIcon(Sym.DELETE, size = 18.sp) })
@@ -529,7 +534,7 @@ private fun ItemDetailCard(item: ItemConfig, state: ItemState?, onSelect: (Strin
             }
             ChoiceRow(stringResource(R.string.detail_where), listOf(Section.SHOWN to stringResource(R.string.section_shown),
                 Section.HIDDEN to stringResource(R.string.section_hidden), Section.OFF to stringResource(R.string.common_off)), item.section) { s ->
-                Store.move(item.id, s, 999)
+                Store.update { it.putIn(item.id, s) }
             }
             val trigger = type.trigger
             if (type.canBeActive && trigger != null) TriggerControl(item, trigger)
@@ -567,8 +572,7 @@ private fun TriggerControl(item: ItemConfig, trigger: Trigger) {
         item.whenActive -> R.string.detail_trigger_help_not_hidden
         else -> R.string.detail_trigger_help_move
     })) { on ->
-        // Only hidden items pop out, so turning the rule on moves a shown or turned-off item behind ‹.
-        Store.updateItem(item.id) { it.copy(whenActive = on, section = if (on) Section.HIDDEN else it.section) }
+        Store.update { it.setWhenActive(item.id, on) }
     }
     if (threshold != null) {
         val r = threshold.range
