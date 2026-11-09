@@ -215,7 +215,7 @@ show the whole system instead.
 | Accessibility service | drawing items on the status bar and running Tools actions |
 | Notifications *(optional)* | timer alerts, and the Live Update chip |
 | Calendar *(optional)* | Next meeting, and events in the month view |
-| Approximate location *(optional)* | Weather's My location, rounded to about 10 km before it is sent |
+| Approximate location *(optional)* | Weather's and Air quality & UV's My location, rounded to about 10 km before it is sent |
 | Alarms and reminders *(optional)* | timers that ring on the second while the Googlebook sleeps |
 | Usage access *(optional)* | the apps using the most data today and the largest apps, in the Network and Storage menus |
 | Internet | Weather and Air quality & UV (Open-Meteo), Flight (AirLabs), US stocks (Finnhub) and Exchange rates (Frankfurter), only after you set them up; nothing else |
