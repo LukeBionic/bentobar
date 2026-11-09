@@ -26,8 +26,17 @@ class FxLoadTest : OnlineServiceContract<FxTable>() {
     override fun waitSec(v: FxTable) = v.retryAfterSec
     override fun numbers(v: FxTable) = v.latest
     override fun every(v: FxTable) = FxRules.every(v)
-    override val retryMs = FxRules.RETRY_MS
-    override val slowMs = FxRules.SLOW_MS
+    // Published in About and the README: literals on purpose, so that changing a constant fails here.
+    override val freshMs: Long? = 60 * 60_000L
+    override val retryMs = 15 * 60_000L
+    override val slowMs = 60 * 60_000L
+
+    @Test fun theConstantsAreThePublishedIntervals() {
+        assertEquals(freshMs, FxRules.FRESH_MS as Long?)
+        assertEquals(15 * 60_000L, FxRules.MENU_MS)
+        assertEquals(retryMs, FxRules.RETRY_MS)
+        assertEquals(slowMs, FxRules.SLOW_MS)
+    }
 
     @Test fun theRequestIsTheEcbsDaysSinceTheStartDateAndNothingElse() {
         val r = FxLoad.request(now)

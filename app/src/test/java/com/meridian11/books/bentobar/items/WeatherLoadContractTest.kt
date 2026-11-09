@@ -24,6 +24,7 @@ class WeatherLoadContractTest : OnlineServiceContract<Reading>() {
     override fun waitSec(v: Reading) = v.retryAfterSec
     override fun numbers(v: Reading) = v.current
     override fun every(v: Reading) = WeatherRules.every(v)
+    override val freshMs: Long? = 30 * 60_000L
     override val retryMs = WeatherRules.RETRY_MS
     override val slowMs = WeatherRules.SLOW_MS
 }

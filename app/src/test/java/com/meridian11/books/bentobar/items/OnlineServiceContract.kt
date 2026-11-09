@@ -33,6 +33,9 @@ abstract class OnlineServiceContract<V : Any> {
     /** This service's numbers for the pace: after no answer, and after being told to slow down with no time named. */
     protected abstract val retryMs: Long
     protected abstract val slowMs: Long
+    /** How long a good reading stays before it is asked again. Each service gives it as a literal, so that a changed constant fails a test. */
+    /** Null where the interval depends on more than the reading (Stocks: the market's hours, tested in its own rules). */
+    protected open val freshMs: Long? = null
 
     private fun good(net: FakeHttp): V {
         net.reply(host, path, goodReply)
@@ -99,6 +102,11 @@ abstract class OnlineServiceContract<V : Any> {
         val v = load(null)!!
         assertEquals("NO_ANSWER", failure(v))
         assertEquals(1, misses(v))
+    }
+
+    @Test fun aGoodReadingIsAskedAgainAtThePublishedInterval() = FakeHttp.use { net ->
+        val fresh = freshMs ?: return@use
+        assertEquals(fresh, every(good(net)))
     }
 
     @Test fun thePaceAfterAFailureIsTheServicesOwn() = FakeHttp.use { net ->

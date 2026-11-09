@@ -22,8 +22,17 @@ class AirLoadTest : OnlineServiceContract<AirReading>() {
     override fun waitSec(v: AirReading) = v.retryAfterSec
     override fun numbers(v: AirReading) = listOf(v.usAqi, v.euAqi, v.uv)
     override fun every(v: AirReading) = AirRules.every(v)
-    override val retryMs = AirRules.RETRY_MS
-    override val slowMs = AirRules.SLOW_MS
+    // Published in About and the README: literals on purpose, so that changing a constant fails here.
+    override val freshMs: Long? = 30 * 60_000L
+    override val retryMs = 15 * 60_000L
+    override val slowMs = 60 * 60_000L
+
+    @Test fun theConstantsAreThePublishedIntervals() {
+        assertEquals(freshMs, AirRules.FRESH_MS as Long?)
+        assertEquals(10 * 60_000L, AirRules.MENU_MS)
+        assertEquals(retryMs, AirRules.RETRY_MS)
+        assertEquals(slowMs, AirRules.SLOW_MS)
+    }
 
     @Test fun theRequestAsksForTodaysHoursSoThePeakIsTodays() {
         val r = AirLoad.request(zurich)
