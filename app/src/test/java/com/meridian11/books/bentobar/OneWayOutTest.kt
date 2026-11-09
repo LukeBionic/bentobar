@@ -21,7 +21,7 @@ class OneWayOutTest {
         val name = place.removePrefix("items/")
         if (!place.startsWith("items/")) return false
         return name.startsWith("Flight") || name.startsWith("AirLabs") || name.startsWith("Stocks") || name.startsWith("Finnhub") ||
-            (!keyed && (name.startsWith("Weather") || name.startsWith("Air") || name.startsWith("Fx")))
+            (!keyed && (name.startsWith("Weather") || name.startsWith("Air") || name.startsWith("Fx") || name == "Places.kt" || name == "OnlineBase.kt"))
     }
 
     @Test fun theSourcesAreThere() {
@@ -86,11 +86,12 @@ class OneWayOutTest {
         assertTrue("'\"' is a character, not the start of a string", "Http.get" in SourceScan.code("val q = '\"'; Http.get(r)"))
     }
 
-    @Test fun onlyFlightAndStocksReadTheirKeys() {
+    @Test fun aKeyIsReadInOnePlaceAndNeverByAnItem() {
+        // The transport adds the key: the item's code never holds one, so a future item can't put it in a message or send it to another service.
         for (f in sources) {
             val place = f.place()
             if (place == "data/Online.kt") continue
-            if ("Online.key(" in code(f)) assertTrue("$place reads a key: only items/Flight*.kt, items/AirLabs*.kt, items/Stocks*.kt and items/Finnhub*.kt may", online(place, keyed = true))
+            if ("Online.key(" in code(f)) assertEquals("$place reads a key: only Http.key's wiring in items/Env.kt may", "items/Env.kt", place)
         }
     }
 

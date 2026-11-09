@@ -20,6 +20,7 @@ class HttpTest {
         Http.connected = { true }
         Http.onMain = { false }
         Http.log = { logged += it }
+        Http.key = { "a-key-nobody-may-see" }
         Http.resetCounts()
     }
 
@@ -29,6 +30,7 @@ class HttpTest {
         Http.connected = { true }
         Http.onMain = { false }
         Http.log = {}
+        Http.key = { null }
         Http.resetCounts()
     }
 
@@ -113,6 +115,28 @@ class HttpTest {
         assertEquals(emptyList<Request>(), fake.asked)
     }
 
+    @Test fun aHostThatTakesAKeyIsNeverAskedWithoutOne() {
+        Http.key = { null }
+        val reply = Http.get(Request(Host.AIRLABS, "/api/v9/flight", listOf("flight_iata" to "LH455"))) as Reply.Failed
+        assertEquals(Why.OFF, reply.why)
+        assertFalse(reply.sent)
+        assertEquals(emptyList<Request>(), fake.asked)
+    }
+
+    @Test fun aHostThatTakesNoKeyNeedsNone() {
+        Http.key = { null }
+        Http.get(forecast)
+        assertEquals(1, fake.asked.size)
+    }
+
+    @Test fun theKeyIsAddedToTheAddressAndNowhereElse() {
+        val r = Request(Host.FINNHUB, "/api/v1/quote", listOf("symbol" to "AAPL"))
+        assertEquals("https://api.finnhub.io/api/v1/quote?symbol=AAPL&token=a%26b", HttpTransport.address(r, "a&b"))
+        assertEquals("https://api.finnhub.io/api/v1/quote?symbol=AAPL", HttpTransport.address(r))
+        assertEquals("a host that takes none gets none", "https://api.open-meteo.com/v1/forecast?latitude=47.37&longitude=8.55", HttpTransport.address(forecast, "a-key"))
+        assertEquals(listOf("symbol" to "AAPL"), r.query)
+    }
+
     @Test fun anAnswerComesBackAndRequestsAreCountedPerHost() {
         fake.reply(Host.OPEN_METEO, "/v1/forecast", """{"current":{}}""")
         val reply = Http.get(forecast)
@@ -127,7 +151,7 @@ class HttpTest {
     }
 
     @Test fun aRequestSaysItsHostAndPathAndNothingOfItsQuery() {
-        val request = Request(Host.AIRLABS, "/api/v9/flight", listOf("flight_iata" to "LH455", "api_key" to "a-key-nobody-may-see"))
+        val request = Request(Host.AIRLABS, "/api/v9/flight", listOf("flight_iata" to "LH455"))
         assertEquals("airlabs.co/api/v9/flight", request.toString())
         fake.reply(Host.AIRLABS, "/api/v9/flight", """{"request":{"key":{"api_key":"a-key-nobody-may-see"}},"response":{}}""")
         Http.get(request)

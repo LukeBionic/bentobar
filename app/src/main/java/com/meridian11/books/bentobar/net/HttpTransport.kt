@@ -30,7 +30,7 @@ class HttpTransport(
 ) : Transport {
 
     override fun get(request: Request): Reply {
-        val address = address(request) ?: return Reply.Failed(Why.REFUSED, sent = false)
+        val address = address(request, Http.key(request.host)) ?: return Reply.Failed(Why.REFUSED, sent = false)
         val deadline = System.nanoTime() + totalMs * 1_000_000L
         var connection: HttpURLConnection? = null
         return try {
@@ -88,11 +88,13 @@ class HttpTransport(
          * The address of [request], or null if its path isn't a plain one: it must start with "/"
          * and hold only letters, digits and `. _ ~ -` between slashes (so no `//`, `@`, `?`, `#`,
          * backslash or space), and no segment that is exactly `.` or `..`. Dots anywhere else are
-         * nothing: Frankfurter's open-ended date range is `/v1/2026-10-05..`.
+         * nothing: a date range like `/v1/2026-10-05..` is a plain segment too.
+         * [key]: the user's own key, added under the name its host takes one by ([Host.keyName]), after the request's own query.
          */
-        fun address(request: Request): String? {
+        fun address(request: Request, key: String? = null): String? {
             if (!PATH.matches(request.path) || request.path.split('/').any { it == "." || it == ".." }) return null
-            val query = request.query.joinToString("&") { (name, value) -> encode(name) + "=" + encode(value) }
+            val own = request.query + listOfNotNull(request.host.keyName?.takeIf { !key.isNullOrEmpty() }?.let { it to key!! })
+            val query = own.joinToString("&") { (name, value) -> encode(name) + "=" + encode(value) }
             return "https://" + request.host.domain + request.path + if (query.isEmpty()) "" else "?$query"
         }
 

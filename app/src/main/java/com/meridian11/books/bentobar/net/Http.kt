@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicLongArray
  * The only hosts BentoBar may ask. A request names one of these; there is no way to name another,
  * and no call anywhere that takes an address. Adding a host means adding it here, where it shows.
  */
-enum class Host(val domain: String) {
+enum class Host(val domain: String, /** The query name this host takes the user's own key under ([Http.key]); null: it takes none. */ val keyName: String? = null) {
     /** Weather forecasts (Open-Meteo). */
     OPEN_METEO("api.open-meteo.com"),
     /** Air quality and UV forecasts (Open-Meteo). */
@@ -16,17 +16,18 @@ enum class Host(val domain: String) {
     /** City search for the weather and air quality items (Open-Meteo). */
     OPEN_METEO_GEOCODING("geocoding-api.open-meteo.com"),
     /** Flight times (AirLabs), with the user's own key. */
-    AIRLABS("airlabs.co"),
+    AIRLABS("airlabs.co", keyName = "api_key"),
     /** Stock quotes and the stock search (Finnhub), with the user's own key. */
-    FINNHUB("api.finnhub.io"),
+    FINNHUB("api.finnhub.io", keyName = "token"),
     /** Reference exchange rates from the European Central Bank (Frankfurter). */
     FRANKFURTER("api.frankfurter.dev"),
 }
 
 /**
  * One GET. [path] starts with "/" and holds no query; [query] is encoded by the transport. A query
- * can hold a key or a city, so [toString] says the host and the path and nothing more: that is all
- * a log line or an error may ever show of a request.
+ * can hold a city, so [toString] says the host and the path and nothing more: that is all a log line
+ * or an error may ever show of a request. It holds no key: the user's own key is added by the
+ * transport, from [Http.key], and so never passes through an item's code.
  */
 class Request(val host: Host, val path: String, val query: List<Pair<String, String>> = emptyList()) {
     override fun toString(): String = host.domain + path
@@ -105,6 +106,8 @@ object Http {
     /** Gets one line per request: "GET host/path -> ok" or "-> STATUS 429". Never a query, never a reply's text. */
     @Volatile var log: (String) -> Unit = {}
     @Volatile var transport: Transport = HttpTransport()
+    /** The user's own key for a [Host] that takes one, or null. Wired by the app; nothing else in the code holds a key for a request. */
+    @Volatile var key: (Host) -> String? = { null }
     /** The time since boot, milliseconds: how the wait a service asked for is counted. */
     @Volatile var clock: () -> Long = { System.nanoTime() / 1_000_000 }
 
@@ -126,6 +129,8 @@ object Http {
         if (onMain()) return refused(request, "the main thread")
         if (!allowed(request.host)) return Reply.Failed(Why.OFF, sent = false)
         if (!connected()) return Reply.Failed(Why.OFFLINE, sent = false)
+        // A host that takes a key is never asked without one, whatever the loader looked at first.
+        if (request.host.keyName != null && key(request.host).isNullOrEmpty()) return Reply.Failed(Why.OFF, sent = false)
         // Before anything is counted as sent: the counter must not say requests left when the transport would refuse them.
         if (HttpTransport.address(request) == null) { log("GET $request refused: not a plain path"); return Reply.Failed(Why.REFUSED, sent = false) }
         val service = Online.serviceOf(request.host).ordinal

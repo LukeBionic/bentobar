@@ -154,4 +154,16 @@ class HttpTransportTest {
             assertTrue("waited ${(System.nanoTime() - began) / 1_000_000} ms", System.nanoTime() - began < 2_500_000_000L)
         }
     }
+
+    @Test fun theUsersKeyGoesOutWithARequestToAHostThatTakesOneAndWithNoOther() {
+        Http.key = { "a-key-nobody-may-see" }
+        try {
+            TinyServer { TinyServer.Answer("{}") }.use { server ->
+                server.transport().get(Request(Host.FINNHUB, "/api/v1/quote", listOf("symbol" to "AAPL")))
+                server.transport().get(forecast)
+                assertEquals("/api/v1/quote?symbol=AAPL&token=a-key-nobody-may-see", server.seen[0].path)
+                assertEquals("/v1/forecast?latitude=47.37&longitude=8.55", server.seen[1].path)
+            }
+        } finally { Http.key = { null } }
+    }
 }

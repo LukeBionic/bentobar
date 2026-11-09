@@ -1,5 +1,7 @@
 package com.meridian11.books.bentobar.net
 
+import com.meridian11.books.bentobar.data.Online
+
 /**
  * A service that isn't there, for the tests of anything that asks one: it answers by host and path
  * with what a test put in, and remembers what it was asked. Nothing leaves the machine.
@@ -50,6 +52,8 @@ class FakeHttp : Transport {
         fun <T> use(test: (FakeHttp) -> T): T {
             val fake = FakeHttp()
             Http.transport = fake
+            // As the app wires it: the switch and key are `Online`'s, and no item's code ever holds a key.
+            Http.key = { host -> Online.key(Online.serviceOf(host)).ifEmpty { null } }
             Http.allowed = { true }
             Http.connected = { true }
             Http.onMain = { false }
@@ -60,6 +64,7 @@ class FakeHttp : Transport {
             } finally {
                 Http.clock = { System.nanoTime() / 1_000_000 }
                 Http.transport = HttpTransport()
+                Http.key = { null }
                 Http.allowed = { false }
                 Http.connected = { true }
                 Http.resetCounts()

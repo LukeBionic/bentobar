@@ -57,11 +57,11 @@ object Finnhub {
      */
     fun symbol(text: String): String? = text.trim().uppercase(Locale.ROOT).takeIf { it.length <= 8 && SYMBOL.matches(it) }
 
-    /** A quote: the symbol and the key, nothing else. */
-    fun quoteRequest(symbol: String, key: String) = Request(Host.FINNHUB, QUOTE, listOf("symbol" to symbol, "token" to key))
+    /** A quote: the symbol, nothing else (the transport adds the user's key). */
+    fun quoteRequest(symbol: String) = Request(Host.FINNHUB, QUOTE, listOf("symbol" to symbol))
 
-    /** The search: the text of the field, limited to US listings, and the key. No language, nothing of the user. */
-    fun searchRequest(text: String, key: String) = Request(Host.FINNHUB, SEARCH, listOf("q" to text, "exchange" to "US", "token" to key))
+    /** The search: the text of the field, limited to US listings (and the transport adds the user's key). No language, nothing of the user. */
+    fun searchRequest(text: String) = Request(Host.FINNHUB, SEARCH, listOf("q" to text, "exchange" to "US"))
 
     /** What a failed request stands for. Null: it was not asked after all (the switch went off, the bar hid). */
     fun failure(reply: Reply.Failed): Failure? = Failures.kind(reply, Failure.OFFLINE, Failure.SLOW_DOWN, Failure.NO_ANSWER) { status ->
