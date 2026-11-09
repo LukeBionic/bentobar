@@ -47,6 +47,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    lint {
+        // Lint is a gate (.github/workflows/ci.yml): any new error fails the build, and the known ones are in
+        // lint-baseline.xml (each with its reason) or suppressed in code with a reason. Warnings stay warnings.
+        abortOnError = true
+        warningsAsErrors = false
+        baseline = file("lint-baseline.xml")
+    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -69,4 +76,19 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation("junit:junit:4.13.2")
+}
+
+// Tests read src/main/res and the manifest by path (ManifestTest, LocaleCopiesTest and others). Gradle does not know
+// that, so without these inputs an edit to the manifest or a string leaves testDebugUnitTest UP-TO-DATE or
+// FROM-CACHE and the tests that pin them never run.
+tasks.withType<Test>().configureEach {
+    inputs.dir("src/main/res").withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("mainRes")
+    inputs.file("src/main/AndroidManifest.xml").withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("mainManifest")
+    // A failure shows its test, message and stack in the log itself: on a CI runner there is only the log.
+    testLogging {
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStackTraces = true
+        showCauses = true
+    }
 }

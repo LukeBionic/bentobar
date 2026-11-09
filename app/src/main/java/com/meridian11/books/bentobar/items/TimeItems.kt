@@ -1,5 +1,6 @@
 package com.meridian11.books.bentobar.items
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
@@ -131,6 +132,9 @@ object CalendarItem : ItemType("calendar", R.string.item_calendar_title, Sym.CAL
 /** The agenda shows this many events at most; the rest are a "+N more" row. */
 private const val AGENDA_MAX = 12
 
+// The menu is composed afresh each time it opens, and a language change restarts the service's windows, so a locale read
+// here once per opening is never stale: nothing needs to observe it.
+@SuppressLint("NonObservableLocale")
 @Composable
 private fun MonthMenu(item: ItemConfig, host: MenuHost) {
     rememberTick()

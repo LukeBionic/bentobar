@@ -126,6 +126,15 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
 - `docs/research/`: the device findings (probe results) and the official-docs research, with URLs.
 - `probe/`: the throwaway feasibility probe (Gradle-free build). Not part of the app.
 
+## Before a PR
+- Run `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleRelease` (CI's `check` runs exactly this on
+  every pull request, with no signing key). Lint errors fail it: fix them, or suppress one in code with the reason
+  beside it. A known error goes into `app/lint-baseline.xml` only with a note saying who removes it.
+- Editing the manifest or a string re-runs the tests that read them; a green run that says UP-TO-DATE after such an
+  edit is wrong, so look.
+- Anything only hardware shows (colours after an unlock, full screen, the empty strip, Play Protect) is on the device
+  list in `docs/RELEASING.md`; run it for changes that touch the strip, the windows or the colour watch.
+
 ## Dev loop
 - `./bento app` builds the debug APK, installs it, enables the service and opens settings.
 - `./bento debug dump|open TYPE|ctx TYPE|chevron|barmenu|hover on|off|scroll TYPE N|timer MIN|awake [MIN|off]|bar on|off|finish|reset|add TYPE [section]|remove ID|set ID k=v|look KEY VALUE|windows`.

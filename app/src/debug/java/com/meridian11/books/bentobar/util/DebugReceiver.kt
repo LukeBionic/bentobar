@@ -58,11 +58,15 @@ class DebugReceiver : BroadcastReceiver() {
                 "cpuprobe" -> { // which CPU-load sources this app may read
                     val out = StringBuilder()
                     val shm = context.getSystemService(android.os.health.SystemHealthManager::class.java)
-                    runCatching {
+                    // Debug builds only (this file is not in release); the headroom calls are API 36 and minSdk is 34, so on an
+                    // older device they throw and runCatching reports that, which is the probe's answer.
+                    @android.annotation.SuppressLint("NewApi")
+                    val cpu = runCatching {
                         out.append("minInterval=${shm.cpuHeadroomMinIntervalMillis} window=${shm.cpuHeadroomCalculationWindowRange} ")
                         out.append("cpuHeadroom=${shm.getCpuHeadroom(android.os.CpuHeadroomParams.Builder().build())} ")
                     }.onFailure { out.append("cpuHeadroom=$it ") }
-                    runCatching { out.append("gpuHeadroom=${shm.getGpuHeadroom(android.os.GpuHeadroomParams.Builder().build())} ") }
+                    @android.annotation.SuppressLint("NewApi") // as above
+                    val gpu = runCatching { out.append("gpuHeadroom=${shm.getGpuHeadroom(android.os.GpuHeadroomParams.Builder().build())} ") }
                         .onFailure { out.append("gpuHeadroom=$it ") }
                     val extra = (args.getOrNull(1)?.split(",") ?: emptyList())
                     for (f in listOf("/proc/stat", "/proc/loadavg", "/proc/uptime", "/proc/pressure/cpu", "/sys/devices/system/cpu/present",

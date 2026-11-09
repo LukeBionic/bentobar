@@ -107,4 +107,52 @@ class ManifestTest {
             ".items.MediaAccess"), exported)
         for (service in application.all("service")) assertNotNull(service.attr("name"), service.attr("permission").takeIf { it.isNotEmpty() })
     }
+
+    // The accessibility service's own config (res/xml/accessibility_service.xml). AGENTS.md "Least privilege" and the Play
+    // declaration both rest on it, so each rule below is one a change has to make on purpose.
+    private val serviceConfig = xml("src/main/res/xml/accessibility_service.xml")
+    private fun Element.flags(name: String) = attr(name).split("|").filter { it.isNotEmpty() }.toSet()
+
+    @Test fun theAccessibilityServiceListensToWindowChangesOnly() {
+        // No content, key or motion events: with them the service would read what apps show.
+        assertEquals(setOf("typeWindowsChanged"), serviceConfig.flags("accessibilityEventTypes"))
+    }
+
+    @Test fun theAccessibilityServiceHasTheThreeFlagsItNeedsAndNoOthers() {
+        // No flagRequestFilterKeyEvents, flagRequestTouchExplorationMode or the like: those are for accessibility tools.
+        assertEquals(setOf("flagRetrieveInteractiveWindows", "flagReportViewIds", "flagIncludeNotImportantViews"), serviceConfig.flags("accessibilityFlags"))
+    }
+
+    @Test fun theAccessibilityServiceNotificationTimeoutIsZero() {
+        // With 200 Android merges window events, and our own strip's resize could swallow the status bar's "hidden" event.
+        assertEquals("0", serviceConfig.attr("notificationTimeout"))
+    }
+
+    @Test fun theAccessibilityServiceSaysItIsNotAnAccessibilityTool() {
+        assertEquals("false", serviceConfig.attr("isAccessibilityTool"))
+    }
+
+    @Test fun theAccessibilityServiceAsksForOnlyItsTwoCapabilities() {
+        // Window content (the status bar window) and a screenshot of that window; no gestures, no key events, no touch
+        // exploration, no zoom, no fingerprint gestures, no accessibility button: every other canXxx attribute is absent.
+        assertEquals("true", serviceConfig.attr("canRetrieveWindowContent"))
+        assertEquals("true", serviceConfig.attr("canTakeScreenshot"))
+        val attributes = (0 until serviceConfig.attributes.length).map { serviceConfig.attributes.item(it) }
+            .filter { it.namespaceURI == android }.map { it.localName }.toSet()
+        assertEquals(setOf("canRetrieveWindowContent", "canTakeScreenshot"), attributes.filter { it.startsWith("can") }.toSet())
+    }
+
+    @Test fun theBarServiceIsDeclaredWithThatConfigAndTheSystemsPermission() {
+        val service = application.all("service").single { it.attr("name") == ".bar.BarService" }
+        assertEquals("android.permission.BIND_ACCESSIBILITY_SERVICE", service.attr("permission"))
+        val meta = service.all("meta-data").single { it.attr("name") == "android.accessibilityservice" }
+        assertEquals("@xml/accessibility_service", meta.attr("resource"))
+        assertEquals(1, application.all("service").count { s -> s.all("action").any { it.attr("name") == "android.accessibilityservice.AccessibilityService" } })
+    }
+
+    @Test fun noCodeChangesTheServiceInfoAtRun() {
+        // setServiceInfo would let code widen what the XML promises (events, flags, timeout) without this test seeing it.
+        val offenders = File("src/main/java").walkTopDown().filter { it.isFile && it.extension == "kt" && "setServiceInfo" in it.readText() }.map { it.path }.toList()
+        assertEquals(emptyList<String>(), offenders)
+    }
 }
