@@ -162,7 +162,7 @@ internal class MenuCoordinator(
         o.params.gravity = Gravity.TOP or Gravity.LEFT
         o.params.width = w // exact, as for menus
         // As tall as its text wants, at the user's text size; at the usual size that is the pill's 28 dp.
-        o.params.height = maxOf((28 * density).toInt(), line + (12 * density).toInt())
+        o.params.height = PopupRules.tooltipHeightPx(line, density)
         o.params.x = (a.centerX() - w / 2).coerceIn(0, (bounds.width() - w).coerceAtLeast(0))
         o.params.y = s.bar.bottom + (4 * density).toInt()
         tip = o

@@ -24,6 +24,13 @@ sealed interface MenuKey {
 /** When pointing at an item opens its popup. Pure, so the rules are tested (`PopupRulesTest`). */
 internal object PopupRules {
     /**
+     * How tall a tooltip's window is for a line of text [line] pixels high: the pill's 28 dp, the height it has always had, and
+     * taller only when a larger text size needs it. The 8 dp is what the words need around them and fits inside the 28 dp at the
+     * default text size at any density (a face's line is up to 1.5 em of its 13 sp), so nothing looks different there.
+     */
+    fun tooltipHeightPx(line: Int, density: Float): Int = maxOf((28 * density).toInt(), line + (8 * density).toInt())
+
+    /**
      * Whether the pointer coming onto item [hovered] opens its popup: only with "Switch popups on hover" [on] (off by
      * default: nothing opens on hover by itself), only while an item's popup or the ‹ menu is [open], never for the
      * item already open, never for a right-click menu, and only for an item that [hasPopup]: one that acts on a click

@@ -15,6 +15,15 @@ class PopupRulesTest {
         assertEquals("meeting", PopupRules.pressedItem(150f, drawn + Span("meeting", 100f, 250f)))
     }
 
+    @Test fun aTooltipKeepsThePillsHeightAtTheDefaultTextSizeAndGrowsWithALargerOne() {
+        // 13 sp of Roboto is 1.327 em from top to bottom: 18 px at density 1, 20 at 1.125, 36 at 2.
+        assertEquals(28, PopupRules.tooltipHeightPx(line = 18, density = 1f))
+        assertEquals(31, PopupRules.tooltipHeightPx(line = 20, density = 1.125f))
+        assertEquals(56, PopupRules.tooltipHeightPx(line = 36, density = 2f))
+        // Twice the text at density 2: 72 px of it, and no clipping.
+        assertTrue(PopupRules.tooltipHeightPx(line = 72, density = 2f) >= 72)
+    }
+
     @Test fun aPressBetweenItemsGoesToTheNearerOne() {
         val drawn = listOf(Span("own", 100f, 200f), Span("next", 260f, 300f))
         assertEquals("own", PopupRules.pressedItem(220f, drawn))
