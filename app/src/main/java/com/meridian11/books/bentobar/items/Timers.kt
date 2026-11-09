@@ -71,6 +71,7 @@ private object TimersOnDevice {
         done = ::done,
         changed = { Chips.update(app) },
         log = { Log.i(TAG, it) },
+        stopped = { Notify.cancelDone(app) },
     )
 
     private fun arm(delayMs: Long?) {

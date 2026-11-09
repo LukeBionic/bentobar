@@ -20,10 +20,11 @@ class TimerClockTest {
     private val armed = ArrayList<Long?>()
     private val alerts = ArrayList<TimerClock.Done>()
     private var chipUpdates = 0
+    private var stops = 0
 
     private fun clock() = TimerClock(TimerClock.Wiring(
         now = { wall }, anchor = { ClockAnchor(wall, elapsed, boot) }, prefs = { prefs },
-        arm = { armed += it }, done = { alerts += it }, changed = { chipUpdates++ }, log = {}))
+        arm = { armed += it }, done = { alerts += it }, changed = { chipUpdates++ }, log = {}, stopped = { stops++ }))
 
     private val timer = clock()
 
@@ -48,6 +49,15 @@ class TimerClockTest {
         assertEquals(wall, prefs.long("finishedAt", 0))
         assertNull("the alarm is taken back", armed.last())
         assertEquals(null, prefs.string("state"))
+    }
+
+    @Test fun stopEndsTheRingOfAFinishedTimer() {
+        // What rings is the finished timer's notification; Stop on the item reaches it through the wiring, with or without a timer running.
+        timer.startTimer(minutes); pass(minutes); timer.check()
+        assertEquals(1, alerts.size)
+        assertEquals(0, stops)
+        timer.stop()
+        assertEquals(1, stops)
     }
 
     @Test fun thePomodoroGoesWorkBreakFourTimesThenALongBreakAndBack() {

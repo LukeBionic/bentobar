@@ -28,6 +28,8 @@ open class TimerClock(private val w: Wiring) {
         val done: (Done) -> Unit,
         val changed: () -> Unit,
         val log: (String) -> Unit,
+        /** The user's Stop: the finished timer's alert, which is what rings, goes with it. */
+        val stopped: () -> Unit = {},
     )
 
     /** What is said when a timer ends. */
@@ -108,7 +110,7 @@ open class TimerClock(private val w: Wiring) {
         }
     }
 
-    fun stop() { set(null); finishedAt = 0; w.prefs().edit { put("finishedAt", 0L) } }
+    fun stop() { set(null); finishedAt = 0; w.prefs().edit { put("finishedAt", 0L) }; w.stopped() }
 
     /** Called every tick and by the alarm: finishes a countdown whose time is up. */
     fun check() {

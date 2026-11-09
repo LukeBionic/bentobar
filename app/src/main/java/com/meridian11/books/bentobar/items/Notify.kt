@@ -64,6 +64,9 @@ object Notify {
         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED &&
             com.meridian11.books.bentobar.data.Uses.on(com.meridian11.books.bentobar.data.Uses.NOTIFICATIONS)
 
+    /** A finished timer rings through its notification (the alarm tone is the channel's), so ending the ring is cancelling it. */
+    fun cancelDone(context: Context) { context.getSystemService(NotificationManager::class.java)?.cancel(ID_DONE) }
+
     fun timerDone(context: Context, title: String, text: String) {
         if (!allowed(context)) return
         channels(context)
