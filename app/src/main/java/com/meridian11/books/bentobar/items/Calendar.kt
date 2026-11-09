@@ -42,29 +42,45 @@ object Calendar {
     }
 
     private const val TAG = "BentoBar"
-    /** How long what was read stays fresh; the provider changing reloads it at once. */
-    const val RELOAD_MS = 60_000L
+    /** How long what was read stays fresh. The provider changing reloads it at once, so this is only for a change it didn't tell of. */
+    const val RELOAD_MS = 15 * 60_000L
+    /**
+     * How long the calendar stays observed and loaded after its last user left. The strip hides for every panel and every
+     * full-screen flip, and it comes back in seconds: without this each of those would read 41 days again and the next
+     * meeting would be gone from the bar until that was done.
+     */
+    const val KEPT_AFTER_LAST_USER_MS = 60_000L
     private lateinit var app: Context
+    private var loaded: () -> Unit = {}
     private val main by lazy { Handler(Looper.getMainLooper()) }
+    /** Who needs the calendar: the two item types while they are sampled, and the Live Update chip, which needs meetings while the service is off. Nobody: no observer, nothing loaded, nothing kept. */
+    private val users = Holders(KEPT_AFTER_LAST_USER_MS, { ms, r -> main.postDelayed(r, ms) }, { main.removeCallbacks(it) }, start = { refresh() }, stop = ::letGo)
     /**
      * Calendar's loading is [Refresher]'s, one load at a time and one snapshot, but on a wiring of its own: `Background`'s
      * stops loading while nothing shows items, and the Live Update chip needs meetings while the service is off.
      */
     private val loader = calendarLoader(
         Refresher.Wiring(Background.executor("calendar"), { Background.onMain(it::run) }, Now::elapsed,
-            changed = { Chips.update(app) }, minGapMs = 0, mayLoad = ::allowed),
+            changed = { Chips.update(app); loaded() }, minGapMs = 0, mayLoad = { users.active && allowed() }),
     ) { load(System.currentTimeMillis()).takeIf { allowed() } }
     val events: List<Event> get() = loader.peek(Unit).orEmpty()
-    private var observing = false
+    private var observer: ContentObserver? = null
 
-    fun init(context: Context) { app = context.applicationContext }
+    /** [loaded]: told on the main thread when what was read has changed (the items that show it are computed again). */
+    fun init(context: Context, loaded: () -> Unit = {}) { app = context.applicationContext; this.loaded = loaded }
+
+    /** [who] needs the calendar from now on: a type going live, the chip. Main thread. */
+    fun hold(who: String) = users.hold(who)
+
+    /** [who] doesn't any more. Main thread. */
+    fun release(who: String) = users.release(who)
 
     fun allowed() = ::app.isInitialized && app.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
         Uses.on(Uses.CALENDAR)
 
     /**
-     * Reloads at most once a minute, or right away after the provider changes. One load at a time:
-     * a sync that changes hundreds of events queues one more load, not hundreds. Main thread.
+     * Reloads at most every [RELOAD_MS], or right away after the provider changes, and only while someone [hold]s the
+     * calendar. One load at a time: a sync that changes hundreds of events queues one more load, not hundreds. Main thread.
      */
     fun refresh(force: Boolean = false) {
         if (!allowed()) { forget(); return }
@@ -80,12 +96,17 @@ object Calendar {
     }
 
     private fun observe() {
-        if (observing) return
-        observing = true
-        app.contentResolver.registerContentObserver(CalendarContract.Instances.CONTENT_URI, true,
-            object : ContentObserver(main) {
-                override fun onChange(selfChange: Boolean) { refresh(force = true) }
-            })
+        if (observer != null || !users.active) return
+        observer = object : ContentObserver(main) {
+            override fun onChange(selfChange: Boolean) { refresh(force = true) }
+        }.also { app.contentResolver.registerContentObserver(CalendarContract.Instances.CONTENT_URI, true, it) }
+    }
+
+    /** The last user has gone: nothing listens to the provider and nothing it said is kept. */
+    private fun letGo() {
+        observer?.let { app.contentResolver.unregisterContentObserver(it) }
+        observer = null
+        forget()
     }
 
     /**

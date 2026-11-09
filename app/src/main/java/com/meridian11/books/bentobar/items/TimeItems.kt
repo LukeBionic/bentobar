@@ -102,6 +102,9 @@ object CalendarItem : ItemType("calendar", R.string.item_calendar_title, Sym.CAL
     // Room for Join and Directions next to an event in the agenda.
     override val menuWidthDp = 340
 
+    override fun onLive() = Calendar.hold(type)
+    override fun onIdle() = Calendar.release(type)
+
     override fun state(item: ItemConfig): ItemState {
         val today = LocalDate.now()
         // No pattern chosen: the locale's own short date ("Sun, Sep 28" in the US, "Sun 28 Sep" in the UK).
@@ -300,6 +303,9 @@ object EventItem : ItemType("event", R.string.item_event_title, Sym.GROUPS, R.st
     override val trigger = Trigger(R.string.trigger_event, R.string.trigger_event_short, before)
     /** How many characters of a title the bar shows. */
     val chars = IntOpt("chars", 20, 8..40)
+
+    override fun onLive() = Calendar.hold(type)
+    override fun onIdle() = Calendar.release(type)
 
     override fun state(item: ItemConfig): ItemState {
         if (!Calendar.allowed()) return ItemState(icon = Sym.GROUPS, desc = Env.str(R.string.event_access_needed))

@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.Executor
 
-/** Calendar's loading is [Refresher]'s on its own numbers: a minute between loads, one more after a burst of changes. */
+/** Calendar's loading is [Refresher]'s on its own numbers: a change reloads it at once, and otherwise it is good for a while; one more after a burst of changes. */
 class CalendarLoaderTest {
     private var clock = 1_000_000L
     private var loads = 0
@@ -22,14 +22,31 @@ class CalendarLoaderTest {
         listOf(Calendar.Event(loads.toLong(), "e", 0, 1, false, 0, "", true, false, null))
     }
 
-    @Test fun itLoadsAtMostOnceAMinuteAndThenAgain() {
+    @Test fun itIsReadAgainOnlyAfterItsFreshnessHasRunOut() {
         loader.want(Unit); run()
         assertEquals(1, loads)
-        clock += 59_000; loader.want(Unit); run()
+        clock += Calendar.RELOAD_MS - 1_000; loader.want(Unit); run()
         assertEquals(1, loads)
         clock += 1_000; loader.want(Unit); run()
         assertEquals(2, loads)
         assertEquals(2, changes)
+    }
+
+    @Test fun aProviderChangeReloadsItAtOnceWhateverItsFreshness() {
+        loader.want(Unit); run()
+        assertEquals(true, loader.refresh(Unit, afterRunning = true))
+        run()
+        assertEquals(2, loads)
+    }
+
+    @Test fun nobodyUsingItMeansNothingLoadsAndItsReadingIsForgotten() {
+        // F28: a provider change or an item's state with no calendar item and the chip off reloaded 41 days.
+        loader.want(Unit); run()
+        may = false
+        loader.forget()
+        loader.want(Unit); assertFalse(loader.refresh(Unit, afterRunning = true)); run()
+        assertEquals(1, loads)
+        assertEquals(null, loader.peek(Unit))
     }
 
     @Test fun aBurstOfProviderChangesQueuesOneMoreLoadNotHundreds() {

@@ -59,7 +59,7 @@ object Env {
         NowPlaying.init(app)
         // Before Timers: a timer that finished while BentoBar wasn't running ends in init, and its
         // chip update asks the calendar.
-        Calendar.init(app)
+        Calendar.init(app) { Ticker.refresh(EventItem.type) }
         com.meridian11.books.bentobar.util.Fonts.init(app)
         Timers.init(app)
         Caffeine.init(app)
