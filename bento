@@ -12,24 +12,18 @@
 #   ./bento menushot [FILE]   the open menu's area
 #   ./bento appshot [FILE]    the settings window
 #
-# adb's server listens on a Unix socket (VSCodeBook's), never tcp:5037: the Linux terminal
-# forwards every TCP port to Android, where any app could reach it.
+# Environment: ADB_SERVER_SOCKET (for example localfilesystem:/path/to/adb.sock, when adb must not listen on
+# tcp:5037) and ANDROID_SERIAL (which device) are passed to adb as they are; with neither set it is plain adb.
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 PKG=com.meridian11.books.bentobar
 SVC="$PKG/$PKG.bar.BarService"
 APK=app/build/outputs/apk/debug/app-debug.apk
-ENVF="$HOME/.config/vscodebook/android.env"
-[ -f "$ENVF" ] && . "$ENVF"
-export ADB_SERVER_SOCKET=${ADB_SERVER_SOCKET:-localfilesystem:$HOME/.local/state/vscodebook/adb.sock}
 TMP=${XDG_RUNTIME_DIR:-/tmp}
 
-serial() { cat "$HOME/.config/vscodebook/adb-serial" 2>/dev/null; }
-connect() {
-  local s; s="$(serial)"
-  if [ -n "$s" ] && adb -s "$s" shell true >/dev/null 2>&1; then echo "$s"; return; fi
-  vscodebook android connect >/dev/null 2>&1 || true
-  serial
+connect() { # the device's serial: ANDROID_SERIAL, else the first attached one
+  if [ -n "${ANDROID_SERIAL:-}" ]; then echo "$ANDROID_SERIAL"; return; fi
+  adb devices | awk 'NR > 1 && $2 == "device" { print $1 }' | head -1
 }
 A() { adb -s "$(connect)" "$@"; }
 dbg() { A shell "am broadcast --user current -a $PKG.DEBUG -p $PKG --es c '$*'" >/dev/null; sleep 0.4
@@ -48,7 +42,7 @@ install() {
   adb -s "$s" shell settings put global verifier_verify_adb_installs 1
 }
 
-# Adds or removes only BentoBar's service; other enabled services (StudioSnap, TalkBack…) stay.
+# Adds or removes only BentoBar's service; other enabled services (TalkBack…) stay.
 # Entries may use the short (pkg/.Class) or full (pkg/pkg.Class) form; both mean BentoBar.
 SVC_SHORT="$PKG/.bar.BarService"
 others() { # the enabled list without BentoBar, colon-separated

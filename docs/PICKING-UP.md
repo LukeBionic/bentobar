@@ -290,7 +290,7 @@ user-facing list. What changed, by area:
 ## Unreleased (2026-10-01): Google Play offers BentoBar to PC-type devices only
 - The manifest requires `android.hardware.type.pc` (Googlebooks report it). The user asked for Play to
   target Googlebooks, or at least desktop Android devices; Play had 5,744 supported device models for
-  0.5, mostly phones. With Summa and StudioSnap (minSdk 34 like BentoBar) this left only the five
+  0.5, mostly phones. With the other apps of the same minSdk 34 this left only the five
   Googlebooks. Android doesn't enforce the feature at install time.
 - **Production on Play waits for the next release.** The user wants BentoBar in production, but 0.5 on
   Play has the unbind crash and no device filter, so it was not promoted. The next version (everything
@@ -406,4 +406,4 @@ Verified on the HP Googlebook 14 (Android 17, SDK 37.1):
 - Profiles (e.g. "Presenting"), triggers beyond "when active".
 - External displays: one strip per display's status bar.
 - Draw the strip with plain Views to cut CPU further.
-- GitHub releases + README screenshots, x86_64 CI like PDF Toolbox's.
+- GitHub releases + README screenshots, x86_64 CI.

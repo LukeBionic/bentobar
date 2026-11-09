@@ -186,7 +186,8 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   On a machine that has `~/.config/bentobar/keystore.jks` and `keystore.pass`, `./gradlew :app:assembleRelease`
   still signs with it; without them the release build is unsigned. A debug and a release install
   can't replace each other (different keys), so uninstall first.
-- adb uses VSCodeBook's Unix socket (`~/.config/vscodebook/android.env`), never tcp:5037.
+- `./bento` takes `ADB_SERVER_SOCKET` and `ANDROID_SERIAL` from the environment (see its header). In the Linux terminal on a
+  Googlebook every TCP port is forwarded to Android, so point `ADB_SERVER_SOCKET` at a Unix socket there, never tcp:5037.
 
 ## Things learned the hard way (see docs/research/device-findings.md)
 - **The status bar window can be opaque.** On the HP it's glyphs on transparent; on the Acer
@@ -355,6 +356,5 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   FLAG_KEEP_SCREEN_ON on the visible strip, a screen wake lock only while the strip is hidden or
   empty, never on the lock screen; an empty strip's window is made invisible), status bar
   screenshots only on a change and only while the strip shows (never on a timer), every overlay visible and there because the user asked for it, and no adb hooks in release.
-- StudioSnap's helper (`~/studiosnap/ss enable`) used to overwrite the whole
-  `enabled_accessibility_services` list and switch BentoBar off; fixed there on 2026-09-28. Both
-  helpers now add or remove only their own entry (short or full component form).
+- `./bento enable` and `disable` add or remove only BentoBar's entry in `enabled_accessibility_services` (short or full
+  component form); overwriting the whole list once switched other accessibility services off.
