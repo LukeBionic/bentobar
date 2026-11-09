@@ -15,8 +15,17 @@ class HidePathTest {
     private val colors = File("src/main/java/com/meridian11/books/bentobar/bar/ColorReader.kt").readText()
     private val menus = File("src/main/java/com/meridian11/books/bentobar/bar/MenuCoordinator.kt").readText()
 
-    /** The branch of check() that runs when the strip is not to be shown. */
-    private val hide = code.substringAfter("\"bar hidden (statusBar=").substringBefore("/** adb `debug trace on|off`")
+    /** The one way off the screen: what check() runs when the strip is not to be shown, and what stop() runs. */
+    private val hide = code.substringAfter("private fun leaveScreen() {").substringBefore("\n    }\n")
+    private val stop = code.substringAfter("fun stop() {").substringBefore("The strip leaves the screen, whatever the reason")
+
+    @Test fun hidingAndStoppingShareTheOneWayOffTheScreen() {
+        val hideBranch = code.substringAfter("\"bar hidden (statusBar=").substringBefore("/** adb `debug trace on|off`")
+        assertTrue("the hide path runs leaveScreen()", Regex("""^\s+leaveScreen\(\)$""", RegexOption.MULTILINE).containsMatchIn(hideBranch))
+        assertTrue("stop() runs leaveScreen()", Regex("""^\s+leaveScreen\(\)$""", RegexOption.MULTILINE).containsMatchIn(stop))
+        // Nothing of the hide path is spelled out again beside it.
+        for (step in listOf("menus.closeMenu(now = true)", "cancelDrag()", "strip.hide()", "colors.stripLeft()")) assertFalse(step, step in stop.replace("leaveScreen()", ""))
+    }
 
     @Test fun theBarHidesInItsOneOrderAndLetsGoOfThePointerBeforeTheWindowGoes() {
         var at = 0
@@ -44,19 +53,18 @@ class HidePathTest {
     }
 
     @Test fun stoppingLeavesNothingRevealedInTheProcesssTicker() {
-        val stop = code.substringAfter("fun stop() {").substringBefore("/** Window events, logged")
         assertTrue(stop, "Ticker.revealHidden = false" in stop)
-        // After closeMenu, which sets it from `expanded` when a popup was open.
-        assertTrue(stop.indexOf("closeMenu(now = true)") < stop.indexOf("Ticker.revealHidden = false"))
+        // After closeMenu (in the way off the screen), which sets it from `expanded` when a popup was open.
+        assertTrue(hide, "closeMenu(now = true)" in hide)
+        assertTrue(stop.indexOf("leaveScreen()") < stop.indexOf("Ticker.revealHidden = false"))
     }
 
     @Test fun theDisplaysItemFollowsTheServiceSoKeepAwakeWhileConnectedHolds() {
         val onConfig = code.substringAfter("private fun onConfig() {").substringBefore("\n    }\n")
         assertTrue("onConfig must call DisplaysItem.follow(true): only it sets the rule's `ruled`", "DisplaysItem.follow(true)" in onConfig)
-        val stop = code.substringAfter("fun stop() {").substringBefore("/** Window events, logged")
         val off = stop.indexOf("DisplaysItem.follow(false)")
         assertTrue("stop() must call DisplaysItem.follow(false)", off >= 0)
-        assertTrue("follow(false) comes before Ticker.stop", off < stop.indexOf("Ticker.stop(\"bar\")"))
+        assertTrue("follow(false) comes before Ticker.stop, in the way off the screen", off < stop.indexOf("leaveScreen()") && "Ticker.stop(\"bar\")" in hide)
     }
 
     @Test fun anItemsMenuIsToldItIsOpeningBeforeItsFirstFrame() {

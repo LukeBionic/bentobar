@@ -28,6 +28,7 @@ internal class KeepAwake(
 ) {
     private val tag = BarService.TAG
     private val expiry = Runnable { Caffeine.check() }
+    private var stopped = false
 
     /** See [update]. Deprecated in favor of FLAG_KEEP_SCREEN_ON, which needs a visible window. */
     @Suppress("DEPRECATION")
@@ -46,6 +47,7 @@ internal class KeepAwake(
     }
 
     fun update() {
+        if (stopped) return
         val on = Caffeine.active() || DisplaysItem.keepingAwake.value
         val f = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         val flags = if (on) strip.params.flags or f else strip.params.flags and f.inv()
@@ -63,6 +65,9 @@ internal class KeepAwake(
         else if (!lock && screenLock.isHeld) screenLock.release()
     }
 
-    /** The service is going: nothing it held may stay held. */
-    fun stop() { if (screenLock.isHeld) screenLock.release() }
+    /** The service is going: nothing it held may stay held, and from here on nothing is asked for. */
+    fun stop() {
+        stopped = true
+        if (screenLock.isHeld) screenLock.release()
+    }
 }

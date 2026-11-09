@@ -242,16 +242,35 @@ class BarController(private val service: AccessibilityService) {
         BarOverflow.ids.value = emptySet()
         runCatching { service.unregisterReceiver(screen) }
         colors.stop()
-        menus.closeMenu(now = true)
-        menus.hideTip()
+        // Before the strip goes, which would ask keep awake for a wake lock in its place.
+        awake.stop()
+        DisplaysItem.follow(false)
+        leaveScreen()
         // Nothing is revealed once this controller is gone: the ticker outlives it, in the process.
         Ticker.revealHidden = false
         main.removeCallbacksAndMessages(null) // after closeMenu, which posts a collapse
         strip.destroy()
-        awake.stop()
-        DisplaysItem.follow(false)
-        Ticker.stop("bar")
         scope.cancel()
+    }
+
+    /**
+     * The strip leaves the screen, whatever the reason: the bar it sits in went away, or the service is going. The one
+     * way off it: a new reason, or a new overlay that must go with the strip, is one edit here. The order is load-bearing
+     * (HidePathTest): the popup and the tooltip go before the window that anchors them, the pointer's holds end before
+     * the release or Exit that would have ended them is lost, and the ticker stops last.
+     */
+    private fun leaveScreen() {
+        menus.closeMenu(now = true)
+        menus.hideTip()
+        cancelDrag() // the strip's window goes, and with it the release that would end a drag
+        // and the Exit that would end a hover: what only the pointer held out doesn't come back with the bar.
+        hovering = false; main.removeCallbacks(expandOnHover)
+        if (!pinned && expanded.value) expanded.value = false
+        strip.hide()
+        // Readings still to come were for a strip that is gone: its return asks again.
+        colors.stripLeft()
+        awake.update()
+        Ticker.stop("bar")
     }
 
     /** Window events, logged only where asked for: `adb shell setprop log.tag.BentoBarEvents DEBUG`. */
@@ -348,17 +367,7 @@ class BarController(private val service: AccessibilityService) {
         } else {
             if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${d.cover?.box?.toShortString()} " +
                 "enabled=${cfg.enabled} interactive=$interactive locked=$locked)")
-            menus.closeMenu(now = true)
-            menus.hideTip()
-            cancelDrag() // the strip's window goes, and with it the release that would end a drag
-            // and the Exit that would end a hover: what only the pointer held out doesn't come back with the bar.
-            hovering = false; main.removeCallbacks(expandOnHover)
-            if (!pinned && expanded.value) expanded.value = false
-            strip.hide()
-            // Readings still to come were for a strip that is gone: its return asks again.
-            colors.stripLeft()
-            awake.update()
-            Ticker.stop("bar")
+            leaveScreen()
         }
     }
 
