@@ -508,6 +508,9 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
     var bounds by remember { mutableStateOf(Rect()) }
     val itemMenuLabel = androidx.compose.ui.res.stringResource(com.meridian11.books.bentobar.R.string.strip_item_menu)
     LaunchedEffect(hovered) { events.itemHover(entry.item, bounds, hovered) }
+    // An item that leaves with the pointer on it (its rule ended, the wheel folded it): the effect above is cancelled, not
+    // run, so the hover's end, and the tooltip's, is said here.
+    DisposableEffect(entry.item.id) { onDispose { if (hovered) events.itemHover(entry.item, bounds, false) } }
     // Dragging sideways: the item lifts and follows the pointer while the others slide aside
     // (animatePlacement, as the controller previews the new order), then it settles into its slot.
     // Positions are measured against the item's untransformed slot: pointer positions relative to

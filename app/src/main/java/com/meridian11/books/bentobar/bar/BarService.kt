@@ -616,6 +616,7 @@ class BarController(private val service: AccessibilityService) {
         override fun hover(inside: Boolean) {
             trace("hover $inside")
             hovering = inside
+            if (!inside) menus.hideTip() // the pointer left the strip: even an item that has gone, and can't say so itself
             main.removeCallbacks(expandOnHover); main.removeCallbacks(collapse)
             if (inside) {
                 if (Store.config.value.hiddenMode == HiddenMode.HOVER && !expanded.value && hiddenItems().isNotEmpty()) main.postDelayed(expandOnHover, 350)

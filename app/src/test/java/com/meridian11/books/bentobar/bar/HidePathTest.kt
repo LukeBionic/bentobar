@@ -85,6 +85,14 @@ class HidePathTest {
         assertTrue("menuOpening runs after closeMenu(dissolve = true)", toggle.indexOf("menuOpening", close) > close)
     }
 
+    /** A tooltip ends with its item: the LaunchedEffect that says "the hover ended" is cancelled, not run, when the item leaves the strip. */
+    @Test fun aTooltipEndsWithItsItem() {
+        val ui = File("src/main/java/com/meridian11/books/bentobar/bar/BarUi.kt").readText()
+        assertTrue(ui, Regex("""onDispose \{ if \(hovered\) events\.itemHover\(entry\.item, bounds, false\) \}""").containsMatchIn(ui))
+        val hover = code.substringAfter("override fun hover(inside: Boolean) {").substringBefore("\n        }\n")
+        assertTrue("the pointer leaving the strip ends its tooltip: $hover", Regex("""if \(!inside\) menus\.hideTip\(\)""").containsMatchIn(hover))
+    }
+
     @Test fun itemsThatLeftOrDidNotFitLeaveNoBoxBehind() {
         val ui = File("src/main/java/com/meridian11/books/bentobar/bar/BarUi.kt").readText()
         assertTrue("items and the chevron report going", ui.contains("onDispose { glow.gone(entry.item.id); events.gone(entry.item.id) }") &&
