@@ -6,7 +6,7 @@ import java.time.ZoneId
 
 /**
  * The Next meeting item's rules. Pure Kotlin (no Android), so they're unit-tested on the JVM.
- * Task-app events never get here: [Calendar] leaves them out when it loads.
+ * Task-app events ([isTask]) never get here: [Calendar] leaves them out when it loads.
  */
 object Meetings {
     /** The horizon's time of day, tomorrow: today, plus 3 hours for a midnight or 1 a.m. meeting. */
@@ -33,6 +33,12 @@ object Meetings {
      */
     fun isMeeting(allDay: Boolean, editable: Boolean, hasCallLink: Boolean, hasOthers: Boolean): Boolean =
         !allDay && editable && (hasCallLink || hasOthers)
+
+    /**
+     * Whether an event that [linksTask] (a task app's link in its notes) is a task and so shows nowhere. A link alone
+     * doesn't make one: a real meeting's notes can link a task. Only with no video-call link and nobody else invited.
+     */
+    fun isTask(linksTask: Boolean, hasCallLink: Boolean, hasOthers: Boolean): Boolean = linksTask && !hasCallLink && !hasOthers
 
     /** What the calendar loads: the [usual] window, then whatever part of the [viewed] month lies before or after it. */
     fun spans(usual: LongRange, viewed: LongRange?): List<LongRange> = buildList {

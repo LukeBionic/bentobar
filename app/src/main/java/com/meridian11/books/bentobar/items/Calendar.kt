@@ -126,6 +126,8 @@ object Calendar {
             CalendarContract.Instances.CALENDAR_ACCESS_LEVEL, CalendarContract.Instances.OWNER_ACCOUNT,
         )
         val out = ArrayList<Event>()
+        // Events whose notes link a task in a task app: a task if nothing says it is a meeting ([Meetings.isTask]).
+        val taskLinked = HashSet<Long>()
         // The calendar owner of each event, for telling the user apart from other attendees.
         val owners = HashMap<Long, String>()
         // An occurrence that crosses from one span into the next comes back from both.
@@ -136,12 +138,10 @@ object Calendar {
                 if (c.getInt(8) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
                 val location = c.getString(6).orEmpty()
                 val text = location + "\n" + c.getString(7).orEmpty()
-                // Tasks synced in from a task app (Todoist links each one, open or done) aren't events:
-                // they show nowhere, not in the agenda, the month view, Next meeting or the chip.
-                if (CallLinks.isTask(text)) continue
                 val allDay = c.getInt(4) != 0
                 val id = c.getLong(0)
                 if (!seen.add(id to c.getLong(2))) continue
+                if (CallLinks.isTask(text)) taskLinked += id
                 c.getString(11)?.let { owners[id] = it }
                 out += Event(
                     eventId = id, title = c.getString(1).orEmpty().ifBlank { app.getString(R.string.calendar_no_title) },
@@ -158,7 +158,9 @@ object Calendar {
         val candidates = out.filter { it.link == null && !it.allDay && it.editable }.mapTo(HashSet()) { it.eventId }
         val withOthers = runCatching { withOthers(candidates, owners) }
             .onFailure { Log.w(TAG, "attendee query failed", it) }.getOrDefault(emptySet())
-        out.map { e ->
+        // Tasks synced in from a task app (Todoist links each one, open or done) aren't events:
+        // they show nowhere, not in the agenda, the month view, Next meeting or the chip.
+        out.filterNot { Meetings.isTask(it.eventId in taskLinked, it.link != null, it.eventId in withOthers) }.map { e ->
             val meeting = Meetings.isMeeting(e.allDay, e.editable, e.link != null, e.eventId in withOthers)
             if (meeting) e.copy(meeting = true) else e
         }.sortedBy { it.begin }

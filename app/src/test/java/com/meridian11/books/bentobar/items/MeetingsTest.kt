@@ -13,6 +13,17 @@ class MeetingsTest {
     private fun at(y: Int, mo: Int, d: Int, h: Int, mi: Int = 0) = LocalDateTime.of(y, mo, d, h, mi).atZone(zone).toInstant().toEpochMilli()
     private val min = 60_000L
 
+    @Test fun aTaskLinkMakesATaskOnlyWithNoCallLinkAndNoOneElse() {
+        // A plain task synced in from a task app.
+        assertTrue(Meetings.isTask(linksTask = true, hasCallLink = false, hasOthers = false))
+        // A real meeting whose notes link a task: it must still show.
+        assertFalse(Meetings.isTask(linksTask = true, hasCallLink = true, hasOthers = false))
+        assertFalse(Meetings.isTask(linksTask = true, hasCallLink = false, hasOthers = true))
+        assertFalse(Meetings.isTask(linksTask = true, hasCallLink = true, hasOthers = true))
+        // An event with no task link is never a task.
+        assertFalse(Meetings.isTask(linksTask = false, hasCallLink = false, hasOthers = false))
+    }
+
     @Test fun horizonIsThreeTomorrow() {
         assertEquals(at(2026, 10, 1, 3), Meetings.horizon(at(2026, 9, 30, 9, 30), zone))
         assertEquals(at(2026, 9, 30, 3), Meetings.horizon(at(2026, 9, 30, 0, 0), zone))
