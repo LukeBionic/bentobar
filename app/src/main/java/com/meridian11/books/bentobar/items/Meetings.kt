@@ -48,6 +48,16 @@ object Meetings {
      */
     fun isTask(linksTask: Boolean, hasCallLink: Boolean, hasOthers: Boolean): Boolean = linksTask && !hasCallLink && !hasOthers
 
+    /** How much of an event's title and place is kept: enough for any menu, and an invitation's sender has no say over it. */
+    const val TITLE_CHARS = 200
+    const val LOCATION_CHARS = 200
+
+    /** An event's title as it is kept: written by whoever sent the invitation, so one line and nothing that turns the text around ([noTitle] if nothing is left). */
+    fun title(raw: String?, noTitle: String): String = TextRules.oneLine(raw.orEmpty(), TITLE_CHARS).ifBlank { noTitle }
+
+    /** An event's place, likewise. */
+    fun location(raw: String?): String = TextRules.oneLine(raw.orEmpty(), LOCATION_CHARS)
+
     /** What the calendar loads: the [usual] window, then whatever part of the [viewed] month lies before or after it. */
     fun spans(usual: LongRange, viewed: LongRange?): List<LongRange> = buildList {
         add(usual)

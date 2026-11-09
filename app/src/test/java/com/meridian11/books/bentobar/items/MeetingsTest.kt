@@ -74,4 +74,18 @@ class MeetingsTest {
         assertFalse(Meetings.asksAttendees(hasCallLink = false, linksTask = false, allDay = true, editable = true))
         assertFalse(Meetings.asksAttendees(hasCallLink = true, linksTask = true, allDay = false, editable = true))
     }
+
+    @Test fun anInvitationsTitleIsCleanedWhereItComesIn() {
+        // Written by whoever sent it: a U+202E must not turn the countdown beside it around, a line break must not drop it.
+        assertEquals("evil meeting", Meetings.title("\u202Eevil\nmeeting", "No title"))
+        assertEquals("No title", Meetings.title(" \n\u202E", "No title"))
+        assertEquals("No title", Meetings.title(null, "No title"))
+        assertEquals(Meetings.TITLE_CHARS, Meetings.title("x".repeat(100_000), "No title").length)
+    }
+
+    @Test fun aLocationIsOneLineAndHasALimit() {
+        assertEquals("Room 4, 2nd floor", Meetings.location("Room 4,\n2nd floor"))
+        assertEquals("", Meetings.location(null))
+        assertEquals(Meetings.LOCATION_CHARS, Meetings.location("y".repeat(100_000)).length)
+    }
 }

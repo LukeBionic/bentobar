@@ -125,17 +125,18 @@ object Calendar {
             while (c.moveToNext()) {
                 if (c.getInt(9) == 0) continue // calendar hidden by the user
                 if (c.getInt(8) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
-                val location = c.getString(6).orEmpty()
-                val text = location + "\n" + c.getString(7).orEmpty()
+                val rawLocation = c.getString(6).orEmpty()
+                // A call link is looked for in the text as it came: a place cut short could lose it.
+                val text = rawLocation + "\n" + c.getString(7).orEmpty()
                 val allDay = c.getInt(4) != 0
                 val id = c.getLong(0)
                 if (!seen.add(id to c.getLong(2))) continue
                 if (CallLinks.isTask(text)) taskLinked += id
                 c.getString(11)?.let { owners[id] = it }
                 out += Event(
-                    eventId = id, title = c.getString(1).orEmpty().ifBlank { app.getString(R.string.calendar_no_title) },
+                    eventId = id, title = Meetings.title(c.getString(1), app.getString(R.string.calendar_no_title)),
                     begin = c.getLong(2), end = c.getLong(3), allDay = allDay,
-                    color = c.getInt(5), location = location,
+                    color = c.getInt(5), location = Meetings.location(rawLocation),
                     editable = c.getInt(10) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
                     meeting = false, link = CallLinks.find(text),
                 )

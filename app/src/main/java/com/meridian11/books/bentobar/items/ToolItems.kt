@@ -316,6 +316,7 @@ fun AppPicker(selected: List<ComponentName>, multi: Boolean, onChange: (List<Com
 object AppItem : ItemType("app", R.string.item_app_title, Sym.ROCKET_LAUNCH, R.string.item_app_desc) {
     override val group = ItemGroup.TOOLS
     override val refreshMs = 60_000L
+    private val mono = Opt.bool("mono", true)
 
     private data class Key(val cn: ComponentName, val mono: Boolean)
     private data class Resolved(val label: String, val icon: Bitmap?)
@@ -329,12 +330,12 @@ object AppItem : ItemType("app", R.string.item_app_title, Sym.ROCKET_LAUNCH, R.s
 
     override fun state(item: ItemConfig): ItemState {
         val cn = cn(item) ?: return ItemState(icon = Sym.ROCKET_LAUNCH, text = Env.str(R.string.app_pick), desc = Env.str(R.string.app_no_app_desc))
-        val mono = item.optBool("mono", true)
-        val key = Key(cn, mono)
+        val themed = mono.of(item)
+        val key = Key(cn, themed)
         resolved.want(key)
         val r = resolved.peek(key)
         val label = r?.label ?: Apps.cachedLabel(cn) ?: cn.packageName
-        val icon = r?.icon ?: Apps.cachedIcon(cn, 64, mono)
+        val icon = r?.icon ?: Apps.cachedIcon(cn, 64, themed)
         return ItemState(image = icon, icon = if (icon == null) Sym.ROCKET_LAUNCH else null, text = label, desc = Env.str(R.string.app_open_desc, label))
     }
 
@@ -345,8 +346,8 @@ object AppItem : ItemType("app", R.string.item_app_title, Sym.ROCKET_LAUNCH, R.s
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        SwitchRow(stringResource(R.string.app_match_color), item.optBool("mono", true), help = stringResource(R.string.app_match_color_help)) {
-            set(item.with("mono", it.toString()))
+        SwitchRow(stringResource(R.string.app_match_color), mono.of(item), help = stringResource(R.string.app_match_color_help)) {
+            set(mono.set(item, it))
         }
         AppPicker(listOfNotNull(cn(item)), multi = false) { set(item.with("app", it.firstOrNull()?.flattenToString())) }
     }
@@ -355,11 +356,13 @@ object AppItem : ItemType("app", R.string.item_app_title, Sym.ROCKET_LAUNCH, R.s
 object FolderItem : ItemType("folder", R.string.item_folder_title, Sym.GRID_VIEW, R.string.item_folder_desc) {
     override val group = ItemGroup.TOOLS
     override val menuWidthDp = 340
-    override fun state(item: ItemConfig) = ItemState(icon = Sym.GRID_VIEW, text = item.opt("label", Env.str(R.string.common_apps)), desc = Env.str(R.string.item_folder_title))
+    private val label = Opt.text("label", 16)
+    override fun state(item: ItemConfig) = ItemState(icon = Sym.GRID_VIEW, text = label.of(item).ifBlank { Env.str(R.string.common_apps) }, desc = Env.str(R.string.item_folder_title))
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host ->
         val apps = Apps.parse(item.opt("apps", ""))
-        MenuCard(Sym.GRID_VIEW, item.opt("label", stringResource(R.string.common_apps))) {
+        val fallback = stringResource(R.string.common_apps)
+        MenuCard(Sym.GRID_VIEW, label.of(item).ifBlank { fallback }) {
             if (apps.isEmpty()) Text(stringResource(R.string.folder_no_apps), style = MaterialTheme.typography.bodyMedium)
             TileGrid {
                 apps.forEach { cn ->
@@ -385,8 +388,8 @@ object FolderItem : ItemType("folder", R.string.item_folder_title, Sym.GRID_VIEW
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
         // The default name is the placeholder, not the text: emptied, the field stays empty while it is typed in.
-        TextRow(stringResource(R.string.folder_name), item.opt("label", ""), placeholder = stringResource(R.string.common_apps), maxLength = 16) {
-            set(item.with("label", it.take(16).ifBlank { null }))
+        TextRow(stringResource(R.string.folder_name), label.of(item), placeholder = stringResource(R.string.common_apps), maxLength = 16) {
+            set(label.set(item, it))
         }
         AppPicker(Apps.parse(item.opt("apps", "")), multi = true) { list ->
             set(item.with("apps", list.joinToString(",") { it.flattenToString() }.ifBlank { null }))
@@ -396,9 +399,12 @@ object FolderItem : ItemType("folder", R.string.item_folder_title, Sym.GRID_VIEW
 
 object TextItem : ItemType("text", R.string.item_text_title, Sym.TEXT_FIELDS, R.string.item_text_desc) {
     override val group = ItemGroup.TOOLS
+    /** The words, which a user may empty on purpose: then the item is just its icon. */
+    private val text = Opt.text("text", 40, clearedIsUnset = false)
+    private fun words(item: ItemConfig) = text.stored(item) ?: Env.str(R.string.text_default)
     override fun state(item: ItemConfig) = ItemState(
         icon = item.options["icon"]?.let { iconChoices.toMap()[it] },
-        text = item.opt("text", Env.str(R.string.text_default)), desc = item.opt("text", Env.str(R.string.text_default)),
+        text = words(item), desc = words(item),
     )
 
     val iconChoices = listOf("none" to "", "star" to Sym.STAR, "heart" to Sym.FAVORITE, "bookmark" to Sym.BOOKMARK,
@@ -416,8 +422,8 @@ object TextItem : ItemType("text", R.string.item_text_title, Sym.TEXT_FIELDS, R.
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        TextRow(stringResource(R.string.text_text), item.opt("text", stringResource(R.string.text_default)), help = stringResource(R.string.text_text_help), maxLength = 40) {
-            set(item.with("text", it.take(40)))
+        TextRow(stringResource(R.string.text_text), text.stored(item) ?: stringResource(R.string.text_default), help = stringResource(R.string.text_text_help), maxLength = 40) {
+            set(text.set(item, it))
         }
         ChoiceRow(stringResource(R.string.text_icon), iconChoices.map { it.first to stringResource(iconNames.getValue(it.first)) },
             item.opt("icon", "none")) { set(item.with("icon", if (it == "none") null else it)) }

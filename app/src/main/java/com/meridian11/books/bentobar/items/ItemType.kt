@@ -280,11 +280,10 @@ open class Trigger(@StringRes val sentence: Int, @StringRes val short: Int, val 
 
 /**
  * A number the user picks for a [Trigger], stored as [key] in [ItemConfig.options]. [default] applies
- * while the key is missing (configs saved before it existed), so it must match the old behavior.
+ * while the key is missing (configs saved before it existed), so it must match the old behavior. The value is read as it
+ * is stored ([of]): an out-of-range value from an older config keeps working, unlike an [IntOpt].
  */
-class Threshold(val key: String, val default: Int, val range: IntRange, val step: Int = 1, val format: (Int) -> String) {
-    /** The stored value, as is: an out-of-range value from an older config keeps working. */
-    fun of(item: ItemConfig): Int = item.optInt(key, default)
+class Threshold(key: String, default: Int, val range: IntRange, val step: Int = 1, val format: (Int) -> String) : Opt<Int>(key, default, { it.toIntOrNull() }) {
     /** For the slider and the words: the stored value, kept in range. */
     fun shown(item: ItemConfig): Int = of(item).coerceIn(range)
     fun snap(v: Float): Int = (range.first + Math.round((v - range.first) / step) * step).coerceIn(range)
