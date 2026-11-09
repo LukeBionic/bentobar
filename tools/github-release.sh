@@ -3,7 +3,8 @@
 # The GitHub half of a release, for .github/workflows/release.yml (docs/RELEASING.md says why):
 #
 #   tools/github-release.sh draft  vX.Y   make the release as a DRAFT from release/ (BentoBar.apk, SHA256SUMS, mapping.txt);
-#                                         if one exists already, check its APK and add only what it lacks
+#                                         if a draft exists already, replace its files with this build's; if a published
+#                                         release exists, check its APK and add only what it lacks
 #   tools/github-release.sh verify vX.Y   download what the release holds and prove it: all three files, checksum,
 #                                         certificate, and the APK's contents (tools/check-apk.sh)
 #
@@ -40,8 +41,10 @@ draft() {
     return
   fi
   echo "::warning::the release $TAG exists already (draft: $DRAFT); checking it and adding only what it lacks"
-  if [ -z "$(asset_id BentoBar.apk)" ]; then
-    echo "::warning::it has no BentoBar.apk; adding this build's files"
+  # A draft is served to nobody, so a rebuilt tag or a half-made draft is simply replaced by this build's three files.
+  # A published release is never touched beyond adding what it lacks.
+  if [ "$DRAFT" = true ] || [ -z "$(asset_id BentoBar.apk)" ]; then
+    echo "::warning::replacing the files of the release with this build's"
     for f in BentoBar.apk SHA256SUMS mapping.txt; do [ -z "$(asset_id "$f")" ] || gh api -X DELETE "repos/$REPO/releases/assets/$(asset_id "$f")"; send "release/$f"; done
     return
   fi
@@ -58,7 +61,7 @@ draft() {
   # R8's mapping fits only the APK it was made with.
   if [ -z "$(asset_id mapping.txt)" ]; then
     if cmp -s "$WORK/BentoBar.apk" release/BentoBar.apk; then send release/mapping.txt
-    else echo "::warning::the release's APK isn't this build's, so this build's mapping.txt doesn't fit it and is not added: the release has no mapping"; fi
+    else echo "::warning::the release's APK isn't this build's, so this build's mapping.txt doesn't fit it and is not added. The run will FAIL at the check: upload the mapping.txt of the build that made that APK (gh release upload $TAG mapping.txt) and re-run"; fi
   fi
 }
 
