@@ -120,9 +120,43 @@ class StripContentTest {
     private val ui = File("src/main/java/com/meridian11/books/bentobar/bar/BarUi.kt").readText()
     private val code = File("src/main/java/com/meridian11/books/bentobar/bar/BarService.kt").readText()
 
+    /**
+     * The whole risk of F25 is these two disagreeing: something ItemView draws that the rule doesn't know is a strip stuck
+     * invisible, and the reverse is a see-through window. So each clause has one definition, in StripContent, and both use it.
+     */
     @Test fun theStripAndTheRuleAgreeOnWhatAnItemDraws() {
-        assertTrue("ItemView draws what StripContent says", "StripContent.parts(" in ui && "val showIcon =" in ui)
-        assertFalse("and works none of it out itself", Regex("""val showText = slider == null""").containsMatchIn(ui))
+        val view = ui.substringAfter("private fun ItemView(").substringBefore("private fun VolumeTrack(")
+        val rule = File("src/main/java/com/meridian11/books/bentobar/bar/StripContent.kt").readText()
+            .substringAfter("fun draws(").substringBefore("/** Whether the strip draws anything")
+        assertFalse("the rule asks the definitions, and reads no fact of the item itself: $rule", Regex("""state\.\w""").containsMatchIn(rule))
+
+        // The line of a spacer.
+        assertTrue(rule, "line(state)" in rule)
+        assertTrue(view, Regex("""entry\.item\.type == "spacer"\) \{\s*Box\([^\n]*\{\s*if \(StripContent\.line\(s\)\) Box\(""").containsMatchIn(view))
+        assertFalse("ItemView works out no line of its own", "s.divider" in view)
+
+        // An alert's capsule.
+        assertTrue(rule, "capsule(state)" in rule)
+        assertTrue(view, "val alert = StripContent.capsule(s)" in view && "alert -> capsule(look.alertBg" in view)
+        assertFalse("ItemView works out no capsule of its own", "s.tone == Tone.ALERT" in view)
+
+        // The icon: nothing of it is drawn but behind the rule's own answer, whichever of the three it turns out to be.
+        assertTrue(rule, "parts.iconDrawn" in rule)
+        assertTrue(view, "val parts = StripContent.parts(s, entry.item.display)" in view)
+        val icon = view.substringAfter("if (parts.iconDrawn) {", "").substringBefore("if (showIcon && (showText")
+        for (drawn in listOf("""\bImage\(""", """\bDayBadge\(""", """\bSymIcon\(""")) {
+            assertEquals(drawn, 1, Regex(drawn).findAll(view).count())
+            assertEquals(drawn, 1, Regex(drawn).findAll(icon).count())
+        }
+
+        // The words: laid out where the rule says, and drawn unless they are nothing but spaces, which keep their place.
+        assertTrue(rule, "parts.textDrawn" in rule)
+        assertTrue(view, "val showText = parts.text" in view)
+        assertEquals(1, Regex("""\bText\(""").findAll(view).count())
+        assertTrue(view, "Text(s.text!!" in view.substringAfter("if (showText) {", ""))
+        val spaces = StripContent.parts(ItemState(icon = "", text = "   "), Display.TEXT)
+        assertTrue(spaces.text)
+        assertFalse(spaces.textDrawn)
     }
 
     /** Finding F08: while invisible nothing draws, and Compose's remeasure waits for a draw, so it is asked for by hand. */

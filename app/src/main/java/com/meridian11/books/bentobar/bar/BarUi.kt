@@ -499,7 +499,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
     val s = entry.state
     if (entry.item.type == "spacer") {
         Box(Modifier.width(s.gapDp.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
-            if (s.divider) Box(Modifier.width(1.dp).height(16.dp).background(look.fg.copy(alpha = 0.45f)))
+            if (StripContent.line(s)) Box(Modifier.width(1.dp).height(16.dp).background(look.fg.copy(alpha = 0.45f)))
         }
         return
     }
@@ -546,7 +546,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
         appear.animateTo(1f, Motion.spec(androidx.compose.animation.core.tween(180,
             easing = androidx.compose.animation.core.CubicBezierEasing(0.2f, 0f, 0f, 1f))))
     }
-    val alert = s.tone == Tone.ALERT
+    val alert = StripContent.capsule(s)
     val color = when (s.tone) {
         Tone.ALERT -> look.alertFg
         Tone.WARN -> look.warn
@@ -641,14 +641,14 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
             // 6 dp to the words, as much as the item has at its two ends: the line is no glyph that belongs to them.
             if (showText || slider != null) Spacer(Modifier.width(6.dp))
         }
-        if (showIcon) {
+        if (parts.iconDrawn) {
             val img = s.image
             if (img != null) {
                 Image(img.asImageBitmap(), null, Modifier.size(look.iconSp.value.dp),
                     colorFilter = if (entry.item.optBool("mono", true) && entry.item.type == "app") ColorFilter.tint(color) else null)
             } else if (s.dayNumber != null) {
                 DayBadge(s.dayNumber, look.iconSp, color, look.background)
-            } else if (s.icon != null && s.icon.isNotEmpty()) {
+            } else if (s.icon != null) {
                 SymIcon(s.icon, size = look.iconSp, filled = s.filled, color = color)
             }
         }

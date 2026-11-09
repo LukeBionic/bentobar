@@ -18,26 +18,34 @@ internal object StripContent {
     /**
      * The parts of an item in the strip. A slider takes the text's place ("Icon and text" draws icon and slider, "Text" the slider
      * alone; shown as an icon only, the item has none). A route line takes the icon's place ("Icon and text" draws line and
-     * words, "Icon" the line alone; shown as text only, the item has none). [icon] and [text] say whether ItemView lays those out.
+     * words, "Icon" the line alone; shown as text only, the item has none). [icon] and [text] say whether ItemView lays those out,
+     * [iconDrawn] and [textDrawn] whether that puts anything on the screen: a place for an icon the item doesn't have is empty, and
+     * words made of nothing but spaces keep their place and show nothing.
      */
-    data class Parts(val slider: BarSlider?, val route: BarRoute?, val icon: Boolean, val text: Boolean)
+    data class Parts(val slider: BarSlider?, val route: BarRoute?, val icon: Boolean, val text: Boolean, val iconDrawn: Boolean, val textDrawn: Boolean)
 
     fun parts(state: ItemState, display: Display): Parts {
         val slider = state.slider?.takeIf { display != Display.ICON }
         val route = state.route?.takeIf { display.line }
-        return Parts(slider, route,
-            icon = route == null && (display != Display.TEXT || state.text.isNullOrEmpty()),
-            text = slider == null && display != Display.ICON && !state.text.isNullOrEmpty())
+        val icon = route == null && (display != Display.TEXT || state.text.isNullOrEmpty())
+        val text = slider == null && display != Display.ICON && !state.text.isNullOrEmpty()
+        return Parts(slider, route, icon, text,
+            iconDrawn = icon && (state.image != null || state.dayNumber != null || !state.icon.isNullOrEmpty()),
+            textDrawn = text && !state.text.isNullOrBlank())
     }
+
+    /** Whether a spacer draws its line. */
+    fun line(state: ItemState) = state.divider
+
+    /** Whether an item has the red capsule of an alert around it. */
+    fun capsule(state: ItemState) = state.tone == Tone.ALERT
 
     /** Whether an item of [type], shown as [display], puts anything on the screen in this [state]. */
     fun draws(type: String, display: Display, state: ItemState): Boolean {
-        if (type == "spacer") return state.divider
-        if (state.tone == Tone.ALERT) return true // its red capsule, around whatever is in it
+        if (type == "spacer") return line(state)
+        if (capsule(state)) return true // around whatever is in it
         val parts = parts(state, display)
-        return parts.slider != null || parts.route != null ||
-            (parts.icon && (state.image != null || state.dayNumber != null || !state.icon.isNullOrEmpty())) ||
-            (parts.text && !state.text.isNullOrBlank())
+        return parts.slider != null || parts.route != null || parts.iconDrawn || parts.textDrawn
     }
 
     /** Whether the strip draws anything: an item that does, ‹, or the pill (which stays up as an empty capsule, as it always has). */
