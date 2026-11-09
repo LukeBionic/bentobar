@@ -31,6 +31,33 @@ workflow checks the APK and the bundle against this certificate and stops if eit
 git tag v<version> && git push origin v<version>
 ```
 
+## On one device before a tag
+
+CI cannot see what only hardware shows. Install the release candidate on one Googlebook (a release build, not debug)
+and look at each of these; AGENTS.md "Things learned the hard way" says why. Run it again on every release candidate.
+
+- **Turning it on.** First open shows the disclosure with two buttons; Agree then leads to Accessibility settings, and
+  turning the service on puts the strip in the status bar. Declining leaves the service off.
+- **The strip's colour.** Light and dark icons on the strip match the status bar's, with a light window and a dark one
+  maximized, and after restoring a window.
+- **Unlock.** Lock and unlock: within about ten seconds the strip's colour matches the bar's again (it once stayed white
+  after the lock screen's light icons).
+- **Full screen.** An app in full screen hides the strip when the bar hides (about 2 s after the app goes full screen)
+  and brings it back when the bar returns; a shade or the keyboard's full-screen key behave the same.
+- **The empty strip.** With every item hidden or empty there is no stray window and no invisible overlay (Play Protect
+  flagged one); Settings shows the strip as empty.
+- **Play Protect.** After the install, Safety Center (Settings > Security) shows no "App displays over other apps" or
+  other warning for BentoBar.
+- **Menus.** The ‹ chevron and an item open their menus at the right width (not cut off, not pushed under the chevron);
+  a click outside closes them; the glass and its shadow sit together.
+- **Live Update chip.** A timer or a meeting shows its chip with BentoBar's settings window closed.
+- **Items that tick.** A clock and a network speed item do not make neighbours move; the bar's CPU use stays low
+  (about 1% of one core on a release build).
+- **Keep awake and timers.** Keep awake keeps the screen on, ends when switched off, and a timer rings once and stops.
+- **Update over the old release.** Installed over the previous release (same key), the layout and the accessibility
+  switch are still there.
+- **Online services.** With them off nothing is asked; weather shows the placeholder, not an error.
+
 ## What the tag does
 
 `.github/workflows/release.yml` runs on every `v*` tag. It:
