@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import androidx.activity.ComponentActivity
@@ -52,7 +53,6 @@ import com.meridian11.books.bentobar.bar.BarStatus
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.items.Chips
 import com.meridian11.books.bentobar.items.Env
-import com.meridian11.books.bentobar.items.HereRules
 import com.meridian11.books.bentobar.items.Items
 import com.meridian11.books.bentobar.items.Notify
 import com.meridian11.books.bentobar.items.Ticker
@@ -119,11 +119,9 @@ class MainActivity : ComponentActivity() {
         intent ?: return
         intent.getStringExtra(EXTRA_ITEM)?.let { selected = it; page = 0 }
         if (intent.getBooleanExtra(EXTRA_EDIT, false)) page = 0
-        intent.getStringExtra(EXTRA_REQUEST)?.let { perm ->
-            // Location only for a layout with an item of My location: this activity is exported, and another app's intent mustn't ask it.
-            if (perm == android.Manifest.permission.ACCESS_COARSE_LOCATION && !HereRules.mayAsk(Store.config.value.items)) return@let
-            if (checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(perm), 1)
-        }
+        // A permission's prompt is asked for in this process ([requestPermission]), never named by an intent: this activity is
+        // exported, so any app could send one, and the prompt would be BentoBar's.
+        takeAsked()?.let { perm -> if (checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(perm), 1) }
         if (intent.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") page = 2
     }
 
@@ -264,7 +262,17 @@ class MainActivity : ComponentActivity() {
         @Volatile var current: MainActivity? = null
         const val EXTRA_ITEM = "item"
         const val EXTRA_EDIT = "edit"
-        const val EXTRA_REQUEST = "request"
+        /** The permission a menu asked for, and when: read once by the window that start opens. */
+        private var asked: Pair<String, Long>? = null
+        private const val ASKED_MS = 10_000L
+
+        @Synchronized private fun ask(permission: String) { asked = permission to SystemClock.elapsedRealtime() }
+
+        @Synchronized private fun takeAsked(): String? {
+            val (permission, at) = asked ?: return null
+            asked = null
+            return permission.takeIf { SystemClock.elapsedRealtime() - at <= ASKED_MS }
+        }
         private const val STATE_PAGE = "page"
         private const val STATE_SELECTED = "selected"
         private const val STATE_DISCLOSURE = "disclosure"
@@ -282,16 +290,15 @@ class MainActivity : ComponentActivity() {
             // here, not from the intent: the activity is exported, and another app's intent mustn't undo it.
             if (permission == android.Manifest.permission.READ_CALENDAR)
                 Store.update { it.copy(turnedOff = it.turnedOff - com.meridian11.books.bentobar.data.Uses.CALENDAR) }
-            context.startActivity(Intent(context, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra(EXTRA_REQUEST, permission))
+            ask(permission)
+            context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         }
 
         fun serviceComponent(context: Context) = ComponentName(context, BarService::class.java)
 
         /** Enabled in Accessibility settings (the service may take a moment to connect). */
         fun serviceOn(context: Context): Boolean {
-            if (Env.service != null) return true
+            if (Env.running) return true
             val am = context.getSystemService(AccessibilityManager::class.java) ?: return false
             val me = serviceComponent(context)
             return am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
