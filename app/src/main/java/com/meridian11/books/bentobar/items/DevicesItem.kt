@@ -58,7 +58,7 @@ object DevicesItem : ItemType("devices", R.string.item_devices_title, Sym.MOUSE,
     override val addsWhenActive = true
 
     /** The same rule as the Battery item's, so the two behave alike. */
-    private val below = Threshold("lowPct", 20, 5..50, step = 5) { "$it%" }
+    private val below = Threshold("lowPct", 20, 5..50, step = 5) { com.meridian11.books.bentobar.util.Fmt.percent(it) }
     override val trigger = Trigger(R.string.trigger_devices, R.string.trigger_devices_short, below)
 
     private val words = DevicesRules.Words(

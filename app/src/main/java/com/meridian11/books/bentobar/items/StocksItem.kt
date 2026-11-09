@@ -40,7 +40,7 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
     override val discreet = true
 
     /** How far a stock moves in a day, in percent, before the item comes out. */
-    private val move = Threshold("movePct", 3, 1..10) { "$it%" }
+    private val move = Threshold("movePct", 3, 1..10) { com.meridian11.books.bentobar.util.Fmt.percent(it) }
     override val trigger = Trigger(R.string.trigger_stocks, R.string.trigger_stocks_short, move)
 
     /** The last quote of each stock, by its symbol: one request per stock, shared by every item that follows it. */

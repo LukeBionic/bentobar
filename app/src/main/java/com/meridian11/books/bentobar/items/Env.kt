@@ -51,6 +51,24 @@ object Env {
     fun init(context: Context) {
         if (::app.isInitialized) return
         app = context.applicationContext
+        // The words of Fmt's formats, from the app's text: read each time, so a change of language is followed.
+        com.meridian11.books.bentobar.util.Fmt.words = com.meridian11.books.bentobar.util.Fmt.Words(
+            percent = { str(R.string.common_percent, it) },
+            byteUnit = { app.resources.getStringArray(R.array.fmt_units_bytes)[it] },
+            rateUnit = { app.resources.getStringArray(R.array.fmt_units_rate)[it] },
+            daysHours = { d, h -> str(R.string.fmt_days_hours, d, h) },
+            hoursMinutes = { h, m -> str(R.string.fmt_hours_minutes, h, m) },
+            minutes = { str(R.string.fmt_minutes, it) },
+            seconds = { str(R.string.fmt_seconds, it) },
+            aloud = { d, h, m, s ->
+                val parts = listOfNotNull(
+                    (d.takeIf { it > 0 })?.let { plural(R.plurals.common_days, it.toInt()) },
+                    (h.takeIf { it > 0 })?.let { plural(R.plurals.common_hours, it.toInt()) },
+                    (m.takeIf { it > 0 })?.let { plural(R.plurals.common_minutes, it.toInt()) },
+                    (s.takeIf { it > 0 || (d == 0L && h == 0L && m == 0L) })?.let { plural(R.plurals.common_seconds, it.toInt()) })
+                parts.reduce { a, b -> str(R.string.fmt_spoken_pair, a, b) }
+            },
+        )
         Store.init(app)
         // The switches for the three online services and the user's keys: in the no-backup directory, which
         // Android leaves out of backups and device transfers. Then the rules for going online at all.

@@ -116,9 +116,12 @@ data class StripLook(
     val background: Color = if (lightText) Color.Black else Color.White,
 ) {
     val textSp: TextUnit get() = when (textSize) { TextSize.SMALL -> 12.5.sp; TextSize.DEFAULT -> 14.sp; TextSize.LARGE -> 15.5.sp }
-    // Measured on the desktop bar: system glyphs are about 13 px wide and 14–16 px tall at 1.125x,
-    // which a 15 sp Material Symbol matches.
-    val iconSp: TextUnit get() = when (textSize) { TextSize.SMALL -> 13.5.sp; TextSize.DEFAULT -> 15.sp; TextSize.LARGE -> 17.sp }
+    /**
+     * The one rule for sizes in the strip: the words are in sp and grow with the user's text size, everything drawn around them is
+     * in dp, as the system bar's own icons are, so a large text size can't push a symbol or a date badge out of a bar of fixed height.
+     * Measured on the desktop bar: system glyphs are about 13 px wide and 14–16 px tall at 1.125x, which a 15 dp Material Symbol matches.
+     */
+    val iconDp: Dp get() = when (textSize) { TextSize.SMALL -> 13.5.dp; TextSize.DEFAULT -> 15.dp; TextSize.LARGE -> 17.dp }
     // Accent and warning colours keep 4.5:1 on the bar too; on a bar where they wouldn't (a mid-tone
     // colour), the text colour is used instead.
     val accent: Color get() = Contrast.orElse(if (lightText) Color(0xFFA8C7FA) else Color(0xFF0B57D0), background, fg)
@@ -502,7 +505,7 @@ private fun Chevron(expanded: Boolean, onLeft: Boolean, look: StripLook, events:
             }
             .padding(horizontal = 3.dp),
         contentAlignment = Alignment.Center,
-    ) { SymIcon(sym, size = look.iconSp, color = look.fg.copy(alpha = 0.85f)) }
+    ) { SymIcon(sym, size = dpFont(look.iconDp), color = look.fg.copy(alpha = 0.85f)) }
 }
 
 /**
@@ -556,7 +559,7 @@ private class ItemDrag(private val scope: kotlinx.coroutines.CoroutineScope) {
 @Composable
 private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, glow: Glow) {
     val s = entry.state
-    if (entry.item.type == "spacer") {
+    if (entry.item.type == com.meridian11.books.bentobar.items.SpacerItem.TYPE) {
         Box(Modifier.width(s.gapDp.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
             if (StripContent.line(s)) Box(Modifier.width(1.dp).height(16.dp).background(look.fg.copy(alpha = 0.45f)))
         }
@@ -615,7 +618,6 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
     }
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val context by rememberUpdatedState { events.context(entry.item, bounds) }
-    val showIcon = parts.icon
     val showText = parts.text
     Row(
         Modifier.fillMaxHeight()
@@ -671,20 +673,20 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
         if (route != null) {
             RouteTrack(route, look, alert, rtl)
             // 6 dp to the words, as much as the item has at its two ends: the line is no glyph that belongs to them.
-            if (showText || slider != null) Spacer(Modifier.width(6.dp))
+            if (parts.gapAfterRoute) Spacer(Modifier.width(6.dp))
         }
         if (parts.iconDrawn) {
             val img = s.image
             if (img != null) {
-                Image(img.asImageBitmap(), null, Modifier.size(look.iconSp.value.dp),
+                Image(img.asImageBitmap(), null, Modifier.size(look.iconDp),
                     colorFilter = if (AppItem.mono.of(entry.item) && entry.item.type == "app") ColorFilter.tint(color) else null)
             } else if (s.dayNumber != null) {
-                DayBadge(s.dayNumber, look.iconSp, color, look.background)
+                DayBadge(s.dayNumber, look.iconDp, color, look.background)
             } else if (s.icon != null) {
-                SymIcon(s.icon, size = look.iconSp, filled = s.filled, color = color)
+                SymIcon(s.icon, size = dpFont(look.iconDp), filled = s.filled, color = color)
             }
         }
-        if (showIcon && (showText || slider != null) && (s.image != null || !s.icon.isNullOrEmpty())) Spacer(Modifier.width(5.dp))
+        if (parts.gapAfterIcon) Spacer(Modifier.width(5.dp))
         if (slider != null) {
             VolumeTrack(slider, held, handle = hovered || held != null, look = look, rtl = rtl,
                 modifier = if (!events.slidable) Modifier
@@ -695,10 +697,10 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
             val templates = s.turns ?: if (s.widthKey != null) listOf(Fmt.widthTemplate(s.text!!)) else null
             val slot = templates?.let { tpls -> remember(tpls, textStyle) { tpls.maxOf { measurer.measure(it, textStyle, maxLines = 1).size.width } } }
             // With an icon, the number stays next to it and the spare room trails; text alone sits at the end.
-            val iconShown = route != null || (showIcon && (s.image != null || !s.icon.isNullOrEmpty()))
+            val iconShown = parts.leadInBeforeText
             // An item that promises a length is held to it in width too: 8.5 dp a character at the usual text
             // size. The count decides what is said; this only catches scripts whose characters are wide.
-            val cap = if (s.textLimit > 0) (8.5f * s.textLimit * look.textSp.value / 14f).dp else Dp.Unspecified
+            val cap = if (s.textLimit > 0) with(density) { (8.5f * s.textLimit * look.textSp.value / 14f).sp.toDp() } else Dp.Unspecified
             Text(s.text!!, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = if (iconShown) TextAlign.Start else TextAlign.End,
                 modifier = (if (slot != null) Modifier.widthIn(min = with(density) { slot.toDp() }) else Modifier).widthIn(max = cap),
                 style = textStyle)
@@ -783,13 +785,14 @@ private fun RouteTrack(route: BarRoute, look: StripLook, alert: Boolean, rtl: Bo
     val glyph = if (route.struck) Sym.AIRPLANEMODE_INACTIVE else Sym.FLIGHT
     val measurer = rememberTextMeasurer()
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val plane = remember(measurer, density, glyph, look.iconSp) { measurer.measure(glyph, TextStyle(fontFamily = Fonts.symbolsFilled, fontSize = look.iconSp, lineHeight = look.iconSp)) }
+    val planeFont = dpFont(look.iconDp)
+    val plane = remember(measurer, density, glyph, planeFont) { measurer.measure(glyph, TextStyle(fontFamily = Fonts.symbolsFilled, fontSize = planeFont, lineHeight = planeFont)) }
     Canvas(Modifier.width(SLIDER_TRACK).fillMaxHeight()) {
         val h = SLIDER_HEIGHT.toPx()
         val top = (size.height - h) / 2
         val radius = CornerRadius(h / 2)
         // The plane is a symbol and grows with the text size: the line makes room for it as it is.
-        val line = SliderMath.route(size.width, route.share, plane = look.iconSp.toPx(), gap = 2.dp.toPx(), rtl = rtl) ?: return@Canvas
+        val line = SliderMath.route(size.width, route.share, plane = look.iconDp.toPx(), gap = 2.dp.toPx(), rtl = rtl) ?: return@Canvas
         line.flown?.let { drawRoundRect(ink, Offset(it.start, top), Size(it.endInclusive - it.start, h), radius) }
         line.ahead?.let { drawRoundRect(ahead, Offset(it.start, top), Size(it.endInclusive - it.start, h), radius) }
         val middle = Offset(line.center, size.height / 2)
@@ -992,10 +995,15 @@ fun Tooltip(label: String) {
  * out in the bar's own color, so it reads at this size on any bar.
  */
 @Composable
-private fun DayBadge(day: Int, size: TextUnit, fg: Color, bg: Color) {
-    Box(Modifier.size(size.value.dp + 1.dp).clip(RoundedCornerShape(4.dp)).background(fg), contentAlignment = Alignment.Center) {
+private fun DayBadge(day: Int, size: Dp, fg: Color, bg: Color) {
+    val digits = dpFont(size * 0.68f)
+    Box(Modifier.size(size + 1.dp).clip(RoundedCornerShape(4.dp)).background(fg), contentAlignment = Alignment.Center) {
         Text("$day", color = bg.copy(alpha = 1f), maxLines = 1,
-            style = TextStyle(fontFamily = Fonts.bar, fontSize = (size.value * 0.68f).sp, lineHeight = (size.value * 0.68f).sp,
+            style = TextStyle(fontFamily = Fonts.bar, fontSize = digits, lineHeight = digits,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontFeatureSettings = "tnum"))
     }
 }
+
+/** A font size that is [size] on the screen whatever the user's text size: for glyphs that are icons ([StripLook.iconDp]), not words. */
+@Composable
+private fun dpFont(size: Dp): TextUnit = with(androidx.compose.ui.platform.LocalDensity.current) { size.toSp() }

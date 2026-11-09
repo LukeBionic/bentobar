@@ -136,7 +136,7 @@ private fun FxQuoteRow(q: PairQuote, amount: Double?) {
                 val sign = if (q.changePct > 0) "+" else "−"
                 val color = if (q.changePct > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                 Text(
-                    "  $sign${q.formattedPct}%",
+                    "  " + com.meridian11.books.bentobar.util.Fmt.percent("$sign${q.formattedPct}"),
                     style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                     color = color,
                 )

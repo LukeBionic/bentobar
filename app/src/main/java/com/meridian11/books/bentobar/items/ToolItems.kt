@@ -493,7 +493,11 @@ object TextItem : ItemType("text", R.string.item_text_title, Sym.TEXT_FIELDS, R.
     override fun defaultOptions() = mapOf("text" to Env.str(R.string.text_default))
 }
 
-object SpacerItem : ItemType("spacer", R.string.item_spacer_title, Sym.SPACE_BAR, R.string.item_spacer_desc) {
+object SpacerItem : ItemType(SpacerItem.TYPE, R.string.item_spacer_title, Sym.SPACE_BAR, R.string.item_spacer_desc) {
+    /** Its name in a layout, and what the strip tells a spacer by ([com.meridian11.books.bentobar.bar.StripContent]). */
+    const val TYPE = "spacer"
+    // Drawn as a gap whatever it is set to show as: neither the settings nor its right-click menu offer "Show as".
+    override val iconOnly = true
     override val group = ItemGroup.TOOLS
     override val refreshMs = 60_000L
 
@@ -502,7 +506,8 @@ object SpacerItem : ItemType("spacer", R.string.item_spacer_title, Sym.SPACE_BAR
     override fun onClick(item: ItemConfig) = true
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        SliderRow(stringResource(R.string.spacer_width), item.spacerWidthDp, SPACER_DP, { "$it dp" }) { set(item.with("width", it.toString())) }
+        val res = androidx.compose.ui.platform.LocalContext.current.resources
+        SliderRow(stringResource(R.string.spacer_width), item.spacerWidthDp, SPACER_DP, { res.getString(R.string.common_dp, it) }) { set(item.with("width", it.toString())) }
         SwitchRow(stringResource(R.string.spacer_line), item.optBool("line", false)) { set(item.with("line", it.toString())) }
     }
 }

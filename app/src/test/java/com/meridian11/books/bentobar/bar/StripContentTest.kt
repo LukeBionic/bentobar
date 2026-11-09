@@ -132,7 +132,7 @@ class StripContentTest {
 
         // The line of a spacer.
         assertTrue(rule, "line(state)" in rule)
-        assertTrue(view, Regex("""entry\.item\.type == "spacer"\) \{\s*Box\([^\n]*\{\s*if \(StripContent\.line\(s\)\) Box\(""").containsMatchIn(view))
+        assertTrue(view, Regex("""entry\.item\.type == [^\n]*SpacerItem\.TYPE\) \{\s*Box\([^\n]*\{\s*if \(StripContent\.line\(s\)\) Box\(""").containsMatchIn(view))
         assertFalse("ItemView works out no line of its own", "s.divider" in view)
 
         // An alert's capsule.
@@ -143,7 +143,7 @@ class StripContentTest {
         // The icon: nothing of it is drawn but behind the rule's own answer, whichever of the three it turns out to be.
         assertTrue(rule, "parts.iconDrawn" in rule)
         assertTrue(view, "val parts = StripContent.parts(s, entry.item.display)" in view)
-        val icon = view.substringAfter("if (parts.iconDrawn) {", "").substringBefore("if (showIcon && (showText")
+        val icon = view.substringAfter("if (parts.iconDrawn) {", "").substringBefore("if (parts.gapAfterIcon)")
         for (drawn in listOf("""\bImage\(""", """\bDayBadge\(""", """\bSymIcon\(""")) {
             assertEquals(drawn, 1, Regex(drawn).findAll(view).count())
             assertEquals(drawn, 1, Regex(drawn).findAll(icon).count())
@@ -176,5 +176,31 @@ class StripContentTest {
 
     @Test fun debugDumpSaysWhetherTheStripIsEmpty() {
         assertTrue("empty=\$stripEmpty" in code)
+    }
+}
+
+/**
+ * The parts of an item for every combination that matters: icon or not, words or not, a slider, a route line, and how the item is set
+ * to show. One table, because a third thing an item can draw in place of its text or icon must agree on all of them at once.
+ */
+class StripItemPartsTest {
+    private data class Case(val icon: Boolean, val text: Boolean, val slider: Boolean, val route: Boolean, val display: Display)
+
+    @Test fun everyCombinationOfAnItemsPartsLaysOutAsItMust() {
+        val flags = listOf(false, true)
+        for (icon in flags) for (text in flags) for (slider in flags) for (route in flags) for (display in Display.entries) {
+            val case = Case(icon, text, slider, route, display)
+            val s = ItemState(icon = if (icon) "I" else "", text = if (text) "words" else null,
+                slider = if (slider) BarSlider(0.5f, 15) else null, route = if (route) BarRoute(0.4f) else null)
+            val p = StripContent.parts(s, display)
+            // A slider takes the words' place, except for an item shown as its icon alone; a route line takes the icon's, except text alone.
+            assertEquals("$case slider", slider && display != Display.ICON, p.slider != null)
+            assertEquals("$case route", route && display != Display.TEXT, p.route != null)
+            assertEquals("$case the route line replaces the icon", p.route == null && (display != Display.TEXT || !text), p.icon)
+            assertEquals("$case the slider replaces the words", p.slider == null && display != Display.ICON && text, p.text)
+            assertEquals("$case gap after the route line", p.route != null && (p.text || p.slider != null), p.gapAfterRoute)
+            assertEquals("$case gap after the icon", p.icon && icon && (p.text || p.slider != null), p.gapAfterIcon)
+            assertEquals("$case the words keep to the left of what comes first", p.route != null || (p.icon && icon), p.leadInBeforeText)
+        }
     }
 }

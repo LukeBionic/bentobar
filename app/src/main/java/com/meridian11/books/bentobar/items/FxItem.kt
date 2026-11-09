@@ -23,7 +23,7 @@ object FxItem : ItemType("fx", R.string.item_fx_title, Sym.SWAP_VERT, R.string.i
     override val online = Online.Service.FRANKFURTER
     override val canBeActive = true
 
-    private val move = Threshold("movePct", 1, 1..5) { "$it%" }
+    private val move = Threshold("movePct", 1, 1..5) { com.meridian11.books.bentobar.util.Fmt.percent(it) }
     override val trigger = Trigger(R.string.trigger_fx, R.string.trigger_fx_short, move)
 
     internal val rates: Refresher<Unit, FxTable> = Background.refresher(

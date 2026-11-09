@@ -39,6 +39,8 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
         }
+        // A debug build also offers the pseudolocales en-XA and ar-XB, which show text that was built in code and a layout that doesn't mirror.
+        debug { isPseudoLocalesEnabled = true }
         // `-PreleaseSignedDebug`: a debug build signed with the release key, so it installs over a released BentoBar on
         // a test device and keeps its layout and its accessibility switch (same id, same key, same version code).
         if (project.hasProperty("releaseSignedDebug")) debug { signingConfig = signingConfigs.getByName("release") }

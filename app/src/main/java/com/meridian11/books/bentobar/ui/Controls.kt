@@ -39,6 +39,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.text.input.ImeAction
@@ -123,7 +124,8 @@ fun SliderRow(label: String, value: Int, range: IntRange, format: (Int) -> Strin
         }
         Slider(value = v, onValueChange = { v = it }, onValueChangeFinished = { onChange(SliderMath.stop(v)) },
             valueRange = range.first.toFloat()..range.last.toFloat(), steps = SliderMath.stops(range),
-            modifier = Modifier.semantics { contentDescription = label })
+            // Read out as its value and unit ("12 dp"), not as a percentage of the track.
+            modifier = Modifier.semantics { contentDescription = label; stateDescription = format(SliderMath.stop(v)) })
     }
 }
 

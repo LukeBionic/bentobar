@@ -169,15 +169,18 @@ fun ItemContextMenu(itemId: String, host: MenuHost, openMenu: () -> Unit) {
         if (item.section != Section.SHOWN) MenuEntry(Sym.VISIBILITY, stringResource(R.string.context_always_show)) { Store.update { it.show(item.id) } }
         if (item.section != Section.HIDDEN) MenuEntry(Sym.VISIBILITY_OFF, stringResource(R.string.section_hidden)) { Store.update { it.hide(item.id) } }
         if (type.canBeActive) MenuEntry(if (item.whenActive) Sym.CHECK_CIRCLE else Sym.UPDATE, stringResource(R.string.context_show_when_active),
-            detail = if (item.whenActive) "✓" else null) {
+            detail = if (item.whenActive) "✓" else null, checked = item.whenActive) {
             Store.update { it.setWhenActive(item.id, !item.whenActive) }
         }
-        SectionLabel(stringResource(R.string.display_show_as))
-        val displays = listOf(Display.ICON_AND_TEXT to stringResource(R.string.display_icon_and_text), Display.TEXT to stringResource(R.string.display_text),
-            Display.ICON to stringResource(R.string.display_icon))
-        ChipRow(displays.map { it.second }, selected = displays.indexOfFirst { it.first == item.display }) { i ->
-            Store.updateItem(item.id) { it.copy(display = displays[i].first) }
-            Ticker.refresh()
+        // Not for a type that has only one way to show: the settings don't offer it either.
+        if (!type.iconOnly) {
+            SectionLabel(stringResource(R.string.display_show_as))
+            val displays = listOf(Display.ICON_AND_TEXT to stringResource(R.string.display_icon_and_text), Display.TEXT to stringResource(R.string.display_text),
+                Display.ICON to stringResource(R.string.display_icon))
+            ChipRow(displays.map { it.second }, selected = displays.indexOfFirst { it.first == item.display }) { i ->
+                Store.updateItem(item.id) { it.copy(display = displays[i].first) }
+                Ticker.refresh()
+            }
         }
         MenuDivider()
         MenuEntry(Sym.TUNE, stringResource(R.string.context_item_settings)) { host.openItemSettings(item.id) }

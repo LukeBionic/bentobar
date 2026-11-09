@@ -158,7 +158,7 @@ abstract class ItemType(
 
     /** Whether "show when active" means something for this type. */
     open val canBeActive: Boolean = false
-    /** Only ever an icon in the bar (no text to show), so settings don't offer "Show as". */
+    /** Drawn one way only (Tools' icon, a Spacer's gap), so neither the settings nor the right-click menu offer "Show as". */
     open val iconOnly: Boolean = false
 
     /** The "Show when…" rule in words, for types that [canBeActive]. */

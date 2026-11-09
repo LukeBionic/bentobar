@@ -96,7 +96,7 @@ object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R
             SoundRules.slider(on = true, fixed = fixed(am), volume = v, min = min, max = max, muted = silenced, kept = kept)
         }
         return ItemState(icon = when { muted -> Sym.VOLUME_OFF; pct < 34 -> Sym.VOLUME_MUTE; pct < 67 -> Sym.VOLUME_DOWN; else -> Sym.VOLUME_UP },
-            text = if (muted) Env.str(R.string.sound_muted) else "$pct%", widthKey = if (muted) null else "pct",
+            text = if (muted) Env.str(R.string.sound_muted) else com.meridian11.books.bentobar.util.Fmt.percent(pct), widthKey = if (muted) null else "pct",
             desc = if (muted) Env.str(R.string.sound_muted_desc) else Env.plural(R.plurals.sound_volume_desc, pct),
             slider = slider,
             // The number the slider stands for; shown as an icon only, the item has no slider and keeps its name as the tooltip.

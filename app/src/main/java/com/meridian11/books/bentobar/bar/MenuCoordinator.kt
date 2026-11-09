@@ -154,13 +154,15 @@ internal class MenuCoordinator(
         val loc = strip.locationOnScreen()
         val a = Rect(anchor).apply { offset(loc[0], loc[1]) }
         val paint = android.text.TextPaint().apply { textSize = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 13f, service.resources.displayMetrics) }
+        val line = paint.fontMetricsInt.let { it.bottom - it.top }
         // A long tip ends in an ellipsis: the window is never wider than this.
         val w = ((paint.measureText(label) + 2 * 10 * density).toInt() + 2).coerceAtMost((TOOLTIP_MAX_DP * density).toInt())
         val bounds = wm.currentWindowMetrics.bounds
         val o = Overlay(service, "BentoBar tooltip", touchable = false)
         o.params.gravity = Gravity.TOP or Gravity.LEFT
         o.params.width = w // exact, as for menus
-        o.params.height = (28 * density).toInt()
+        // As tall as its text wants, at the user's text size; at the usual size that is the pill's 28 dp.
+        o.params.height = maxOf((28 * density).toInt(), line + (12 * density).toInt())
         o.params.x = (a.centerX() - w / 2).coerceIn(0, (bounds.width() - w).coerceAtLeast(0))
         o.params.y = s.bar.bottom + (4 * density).toInt()
         tip = o

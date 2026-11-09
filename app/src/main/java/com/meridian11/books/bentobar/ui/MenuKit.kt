@@ -60,8 +60,12 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
@@ -120,7 +124,7 @@ fun MenuCard(
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fadeIn(20f))
+                    modifier = Modifier.fadeIn(20f).semantics { heading() })
                 if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall,
                     color = subtitleColor, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(36f))
             }
@@ -176,7 +180,7 @@ fun SectionLabel(text: String) = Text(text.uppercase(), style = MaterialTheme.ty
     // On glass halfway to the text's colour: the accent alone fell to 2:1 over a dark window behind (visual.md §5).
     color = if (LocalMenuGlass.current?.blur == true) androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.primary,
         MaterialTheme.colorScheme.onSurface, 0.5f) else MaterialTheme.colorScheme.primary,
-    modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
+    modifier = Modifier.padding(top = 4.dp, bottom = 6.dp).semantics { heading() })
 
 /** A small line chart of recent values, filled underneath. Two series share one scale. */
 @Composable
@@ -227,11 +231,12 @@ fun Sparkline(
  * A full-width row button, like a desktop menu entry. [sub]: a second, quieter line under the label
  * (a place's region); the row is then at least 48 dp high. [image]: a picture, 20 dp, in the
  * symbol's place (an app's icon). [trailing]: one control of its own at the row's end (a × to remove
- * a city, a player's play button), which takes its own clicks.
+ * a city, a player's play button), which takes its own clicks. [checked]: the entry is an on/off rule, and says so to a screen
+ * reader ([detail], the mark that shows it to the eye, is then not read out as well). Null: a plain entry.
  */
 @Composable
 fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Boolean = true, modifier: Modifier = Modifier,
-              sub: String? = null, image: ImageBitmap? = null, trailing: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
+              sub: String? = null, image: ImageBitmap? = null, trailing: (@Composable () -> Unit)? = null, checked: Boolean? = null, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     val focused by source.collectIsFocusedAsState()
@@ -243,7 +248,8 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
             // An Enter that is being held when the focus arrives here (a search's results come in and the
             // first takes the focus) is not this entry's: its repeats are swallowed, so its release presses nothing.
             .onPreviewKeyEvent { e -> (e.key == Key.Enter || e.key == Key.NumPadEnter) && e.type == KeyEventType.KeyDown && e.nativeKeyEvent.repeatCount > 0 }
-            .clickable(enabled = enabled, interactionSource = source, indication = null, onClick = onClick)
+            .then(if (checked == null) Modifier.clickable(enabled = enabled, interactionSource = source, indication = null, onClick = onClick)
+                else Modifier.toggleable(value = checked, enabled = enabled, interactionSource = source, indication = null, role = Role.Checkbox, onValueChange = { onClick() }))
             .pointerHoverIcon(PointerIcon.Hand)
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -259,8 +265,10 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
             Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.fadeIn(36f))
+        // At most half the row: a long detail would otherwise squeeze the label away; a short one takes only its own width.
+        if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.layout { m, c -> val p = m.measure(c.copy(maxWidth = c.maxWidth / 2)); layout(p.width, p.height) { p.place(0, 0) } }
+                .fadeIn(36f).then(if (checked != null) Modifier.clearAndSetSemantics { } else Modifier))
         if (trailing != null) Box(Modifier.fadeIn(36f)) { trailing() }
     }
 }
@@ -271,10 +279,13 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
  */
 @Composable
 fun SmallIconButton(sym: String, label: String, color: Color = LocalContentColor.current, enabled: Boolean = true, onClick: () -> Unit) {
-    Box(Modifier.minimumInteractiveComponentSize().clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+    val source = remember { MutableInteractionSource() }
+    val focused by source.collectIsFocusedAsState()
+    Box(Modifier.minimumInteractiveComponentSize().clickable(interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current,
+        enabled = enabled, role = Role.Button, onClick = onClick)
         .then(if (enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
         contentAlignment = Alignment.Center) {
-        Box(Modifier.size(28.dp).clip(CircleShape), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(28.dp).focusRing(focused, CircleShape).clip(CircleShape), contentAlignment = Alignment.Center) {
             SymIcon(sym, size = 18.sp, contentDescription = label, color = if (enabled) color else color.copy(alpha = 0.38f))
         }
     }
@@ -495,16 +506,19 @@ fun ChipRow(labels: List<String>, selected: Int? = null, onClick: (Int) -> Unit)
             val hovered by source.collectIsHoveredAsState()
             val focused by source.collectIsFocusedAsState()
             val chosen = selected == i
-            Text(if (chosen) "✓ $l" else l, style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = popIn.heightIn(min = 32.dp).focusRing(focused, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
+            Row(popIn.heightIn(min = 32.dp).focusRing(focused, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
                     .background(if (hovered) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
                         else MaterialTheme.colorScheme.secondaryContainer)
                     .hoverable(source)
                     .then(if (selected == null) Modifier.clickable(interactionSource = source, indication = null) { onClick(i) }
                         else Modifier.selectable(selected = chosen, interactionSource = source, indication = null, role = Role.RadioButton) { onClick(i) })
                     .pointerHoverIcon(PointerIcon.Hand)
-                    .padding(horizontal = 12.dp, vertical = 6.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                // The mark is for the eye: a screen reader hears "selected" from the role, and "check mark" on top of it was noise.
+                if (chosen) Text("✓ ", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.clearAndSetSemantics { })
+                Text(l, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            }
         }
     }
 }
