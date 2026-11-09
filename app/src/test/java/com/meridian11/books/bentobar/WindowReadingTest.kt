@@ -32,6 +32,18 @@ class WindowReadingTest {
         }
     }
 
+    @Test fun theStatusBarWindowIsTheOnlyTreeWalkedAndItsOwnPictureIsTheOnlyOneTaken() {
+        // The disclosure says the layout of the status bar is read, and the colour of its clock from a picture of its own window.
+        // The two files may use the API (the test above); these pin which window each call is given.
+        fun where(needle: String) = sources.filter { needle in code(it) }.flatMap { f -> List(Regex(Regex.escape(needle)).findAll(code(f)).count()) { f.place() } }
+        assertEquals("the one tree walk is in StatusBarScan.scan", listOf("bar/StatusBarScan.kt"), where("getRoot("))
+        assertEquals("the scan has one caller, BarService.check", listOf("bar/BarService.kt"), where("StatusBarScan.scan("))
+        assertTrue("check hands the scan the status bar's own window",
+            "StatusBarScan.scan(windows[listed.indexOf(barFact)])" in code(File("src/main/java/com/meridian11/books/bentobar/bar/BarService.kt")))
+        assertEquals("the one picture is of one window, by its id", listOf("bar/StatusBarScan.kt"), where("takeScreenshotOfWindow(s.windowId"))
+        assertEquals("no picture of the whole screen", emptyList<String>(), where("takeScreenshot("))
+    }
+
     @Test fun theGlobalActionsAreOneCallInBarService() {
         // Tools and Shortcut press Back, Home, Recents and the like through Env.global, which asks BarService.global.
         val users = sources.filter { Regex("""\bperformGlobalAction\b""").containsMatchIn(code(it)) }.map { it.place() }
