@@ -33,9 +33,15 @@ class DebugReceiver : BroadcastReceiver() {
         Env.init(context)
         val args = intent.getStringExtra("c").orEmpty().trim().split(Regex("\\s+"))
         if (args[0] == "winshot") return winshot(args.drop(1).joinToString(" ").ifEmpty { "BentoBar menu" })
-        val bar = (Env.service as? BarService)?.controller()
+        val bar = BarService.current?.controller()
         val out = try {
             when (args[0]) {
+                // Every window's id, type, title and place. Here, in the debug source set only: the release app reads no window's title
+                // but one (see BarService.check), and a test pins that.
+                "windows" -> (BarService.current ?: error("service not running")).windows.joinToString(" | ") { w ->
+                    val r = android.graphics.Rect().also { w.getBoundsInScreen(it) }
+                    "${w.id}:t${w.type}:${w.title}:${r.toShortString()}"
+                }
                 "cfg" -> Store.export()
                 "import" -> { // a whole layout, base64 JSON (e.g. to restore one saved with cfg)
                     val json = String(android.util.Base64.decode(args[1], android.util.Base64.DEFAULT))
@@ -159,7 +165,7 @@ class DebugReceiver : BroadcastReceiver() {
      * mouse pointer, and never show other apps.
      */
     private fun winshot(title: String) {
-        val svc = Env.service ?: run { resultData = "service not running"; return }
+        val svc = BarService.current ?: run { resultData = "service not running"; return }
         // The settings window (its own surface, without the caption), found by its title: no other
         // app's window content is read to find it.
         val label = svc.applicationInfo.loadLabel(svc.packageManager).toString()

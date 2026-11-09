@@ -122,7 +122,7 @@ object CaffeineItem : ItemType("caffeine", R.string.item_caffeine_title, Sym.COF
     }
 
     override fun onClick(item: ItemConfig): Boolean {
-        if (Env.service == null) return false // menu explains why it can't work
+        if (!Env.running) return false // menu explains why it can't work
         Caffeine.toggle(item.opt("minutes", "").toIntOrNull())
         return true
     }
@@ -134,7 +134,7 @@ object CaffeineItem : ItemType("caffeine", R.string.item_caffeine_title, Sym.COF
         rememberTick()
         val on = Caffeine.active()
         MenuCard(Sym.COFFEE, stringResource(R.string.item_caffeine_title), when {
-            Env.service == null -> stringResource(R.string.caffeine_needs_service)
+            !Env.running -> stringResource(R.string.caffeine_needs_service)
             !on -> stringResource(R.string.caffeine_off_subtitle)
             Caffeine.until.value == Caffeine.FOREVER -> stringResource(R.string.caffeine_until_off_subtitle)
             else -> stringResource(R.string.caffeine_for_subtitle, Fmt.duration(Caffeine.until.value - System.currentTimeMillis()))

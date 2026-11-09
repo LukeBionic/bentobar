@@ -64,11 +64,22 @@ import java.util.concurrent.Executors
  * It doesn't observe keys or touches.
  */
 class BarService : AccessibilityService() {
+    companion object {
+        const val TAG = "BentoBar"
+
+        /** The connected service, or null. Only bar/ may hold it; the rest of the app asks [global] or Env.running. */
+        @Volatile var current: BarService? = null
+            private set
+
+        /** One of the Tools and Shortcut menu's global actions (Back, Home, Recents...), false with no service. */
+        fun global(action: Int): Boolean = current?.performGlobalAction(action) ?: false
+    }
+
     private var bar: BarController? = null
 
     override fun onServiceConnected() {
         Env.init(this)
-        Env.service = this
+        current = this
         bar?.stop() // connected again without an unbind: the old strip's windows mustn't stay up
         bar = BarController(this).also { it.start() }
         Chips.update(this)
@@ -95,14 +106,12 @@ class BarService : AccessibilityService() {
         val stopping = bar
         bar = null // first: whatever stop() does, it runs once per controller
         stopping?.stop()
-        if (Env.service === this) Env.service = null
+        if (current === this) current = null
         Chips.update(this)
         com.meridian11.books.bentobar.ui.Setup.refresh(this)
     }
 
     fun controller(): BarController? = bar
-
-    companion object { const val TAG = "BentoBar" }
 }
 
 /** Item types still shown while presenting (when active): a running timer, a meeting about to start. */
@@ -378,7 +387,7 @@ class BarController(private val service: AccessibilityService) {
             if (newWindow) readSoon(ColorWatch.Cause.QUICK, 250)
             else if (moved) { watch.windows(SystemClock.uptimeMillis()); arm() }
         } else {
-            if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${cover?.let { "${it.title} " + Rect().also { r -> it.getBoundsInScreen(r) }.toShortString() }} " +
+            if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${cover?.let { Rect().also { r -> it.getBoundsInScreen(r) }.toShortString() }} " +
                 "enabled=${cfg.enabled} interactive=${pm.isInteractive} locked=${km.isKeyguardLocked})")
             closeMenu(now = true)
             hideTip()
@@ -979,10 +988,6 @@ class BarController(private val service: AccessibilityService) {
             "close" -> { closeMenu(); "ok" }
             "solid" -> { MenuWindow.solid = cmd.getOrNull(1) != "off"; "solid=${MenuWindow.solid}" }
             "scan" -> { scan(); "snap=$snap" }
-            "windows" -> service.windows.joinToString(" | ") { w ->
-                val r = Rect().also { w.getBoundsInScreen(it) }
-                "${w.id}:t${w.type}:${w.title}:${r.toShortString()}"
-            }
             "sample" -> { sampleColor(); "sampling" }
             "trace" -> { tracing = cmd.getOrNull(1) != "off"; "trace=$tracing" }
             else -> "unknown"

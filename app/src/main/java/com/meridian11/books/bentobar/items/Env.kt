@@ -1,6 +1,5 @@
 package com.meridian11.books.bentobar.items
 
-import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.ActivityNotFoundException
@@ -23,6 +22,7 @@ import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import com.meridian11.books.bentobar.BuildConfig
 import com.meridian11.books.bentobar.R
+import com.meridian11.books.bentobar.bar.BarService
 import com.meridian11.books.bentobar.data.Online
 import com.meridian11.books.bentobar.data.Section
 import com.meridian11.books.bentobar.data.Store
@@ -37,8 +37,8 @@ object Env {
     const val TAG = "BentoBar"
     lateinit var app: Context private set
 
-    /** The running accessibility service (global actions, overlay windows), or null. */
-    @Volatile var service: AccessibilityService? = null
+    /** Whether the accessibility service is connected. The service itself stays inside bar/: items never hold it. */
+    val running: Boolean get() = BarService.current != null
 
     val net = NetSampler()
     val cpu = CpuSampler()
@@ -127,7 +127,7 @@ object Env {
     fun plural(@PluralsRes id: Int, count: Int, vararg args: Any): String =
         if (args.isEmpty()) app.resources.getQuantityString(id, count, count) else app.resources.getQuantityString(id, count, *args)
 
-    fun global(action: Int): Boolean = service?.performGlobalAction(action) ?: false
+    fun global(action: Int): Boolean = BarService.global(action)
 
     /** Puts [text] on the clipboard (a flight's status, the times of a planned moment). */
     fun copy(text: String) {

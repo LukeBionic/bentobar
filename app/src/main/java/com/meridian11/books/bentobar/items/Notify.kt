@@ -136,7 +136,7 @@ object Chips {
         val app = context.applicationContext.also { this.app = it }
         val nm = app.getSystemService(NotificationManager::class.java) ?: return
         val cfg = Store.config.value
-        val barUp = Env.service != null && cfg.enabled
+        val barUp = Env.running && cfg.enabled
         val wanted = when (cfg.chipMode) {
             ChipMode.OFF -> false
             ChipMode.FALLBACK -> !barUp

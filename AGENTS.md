@@ -296,7 +296,11 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   names the hour the chance is for, and an hour's cell takes its chance from the entry after it.
 - **Least privilege** (user feedback): the accessibility config subscribes only to
   `typeWindowsChanged`. No content events, key filtering or motion events. The status bar is the only
-  window whose content code reads; of any other window it reads the type and where it is. The service
+  window whose content code reads; of any other window it reads the type and where it is. One title is read, and
+  only that: `BarService.check` skips the screenshot preview by the title of a large TYPE_SYSTEM window (the title is
+  compared, never logged or kept; `WindowReadingTest` allows `.title` on a window nowhere else, and the `windows` debug
+  hook that lists titles is in `src/debug`). The accessibility API (nodes, windows, screenshots) is named only in
+  `bar/BarService.kt` and `bar/StatusBarScan.kt`; items get `Env.running` and `Env.global`, never the service. The service
   never touches another app's window or field (paste into a field was removed in 1.8, and `ManifestTest` keeps
   it out). Don't add broader access for nice-to-haves.
 - `notificationTimeout` must stay 0. With 200, Android merges window events; our own strip's
