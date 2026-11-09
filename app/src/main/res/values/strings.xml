@@ -124,6 +124,7 @@
     <string name="usage_top_storage">Largest apps</string>
     <string name="usage_loading">Loading…</string>
     <string name="usage_none_data">No data used yet today</string>
+    <string name="usage_storage_launcher_only">Only apps with a launcher entry are counted.</string>
     <string name="usage_none_storage">No app sizes available</string>
     <string name="usage_no_ethernet">Ethernet isn\'t included: Android doesn\'t report it per app.</string>
     <string name="usage_android_system">Android system</string>
