@@ -153,21 +153,11 @@ class BarController(private val service: AccessibilityService) {
         expanded.value = false; pinned = false
         if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
     }
-    private var menu: MenuWindow? = null
+    /** Which popup is up, which is still folding away, and whose click a press has spent. */
+    private val popups = PopupState<MenuWindow>()
+    private val menu get() = popups.open
     // Observable, so the strip's highlight can stay on the item whose popup is open (StripHost).
     private var menuKey: MenuKey? by mutableStateOf(null)
-    /**
-     * The popup a press on its own item just closed: that press's click, which reaches the strip after the
-     * popup heard of the press, is spent (it would open the popup again). Only that one click, and only for a
-     * moment: a second click turns the popup round while it is still folding away.
-     */
-    private var spentKey: MenuKey? = null
-    private var spentAt = 0L
-    /** A popup still folding away, and its key: clicked again meanwhile, it turns round. */
-    private var leaving: MenuWindow? = null
-    private var leavingKey: MenuKey? = null
-    /** It is folding away so that something can run once it is off the screen (a screenshot): it doesn't turn round. */
-    private var leavingThen = false
     private var snap: BarSnapshot? = null
     private var sampled: BarColors? = null
     private var overlayIds = emptySet<Int>()
@@ -800,15 +790,16 @@ class BarController(private val service: AccessibilityService) {
     fun toggleMenu(key: MenuKey, anchor: Rect, widthDp: Int, content: @Composable (MenuHost) -> Unit) {
         val now = SystemClock.uptimeMillis()
         hideTip()
-        if (menuKey == key) { closeMenu(); return }
-        if (spentKey == key) { spentKey = null; if (now - spentAt < 1000) return }
-        spentKey = null
-        val back = leaving
-        if (menu == null && !leavingThen && leavingKey == key && back != null && back.reopen()) {
-            leaving = null; leavingKey = null
-            menu = back; menuKey = key
-            focusMenu(key)
-            return
+        when (val step = popups.toggle(key, now)) {
+            PopupCommand.Fold -> { closeMenu(); return }
+            PopupCommand.Spend -> return
+            is PopupCommand.Reopen -> if (step.popup.reopen()) {
+                popups.reopened(step.popup, key)
+                menuKey = key
+                focusMenu(key)
+                return
+            }
+            PopupCommand.Open, PopupCommand.Dissolve -> Unit
         }
         closeMenu(dissolve = true) // resets the sampling demand, so the new popup's is set after it
         val s = snap ?: return
@@ -828,7 +819,7 @@ class BarController(private val service: AccessibilityService) {
         val maxH = ((bounds.height() - s.bar.bottom) / density - 170).toInt().coerceAtLeast(200)
         val o = MenuWindow(service, "BentoBar menu", onOutside = { outside(it) }, onEscape = { closeMenu() })
         if (!o.show(x, y, w, shadow = { MenuShadow(widthDp.dp, o.glass) }) { MenuSurface(widthDp.dp, maxH.dp, o.glass) { content(host) } }) return
-        menu = o
+        popups.opened(o, key)
         menuKey = key
         focusMenu(key)
     }
@@ -839,7 +830,7 @@ class BarController(private val service: AccessibilityService) {
      * else it folds. (A press on another app's window comes without coordinates: it is "anywhere else".)
      */
     private fun outside(ev: MotionEvent) {
-        val key = menuKey ?: return
+        if (menuKey == null) return
         val loc = strip.locationOnScreen()
         val x = ev.rawX - loc[0]
         val y = ev.rawY - loc[1]
@@ -847,10 +838,10 @@ class BarController(private val service: AccessibilityService) {
             x >= 0 && x < strip.params.width && y >= 0 && y < (snap?.bar?.height() ?: 0)
         // The same rule as the highlight's: a press in a gap belongs to the item on its side of the gap's middle.
         val hit = if (onStrip) PopupRules.pressedItem(x, placed.map { (k, r) -> Span(k, r.left.toFloat(), r.right.toFloat()) }) else null
-        when (hit) {
-            null -> closeMenu()
-            key.owner -> { spentKey = key; spentAt = SystemClock.uptimeMillis(); closeMenu() }
-            else -> closeMenu(dissolve = true)
+        when (popups.press(hit, SystemClock.uptimeMillis())) {
+            PopupCommand.Fold -> closeMenu()
+            PopupCommand.Dissolve -> closeMenu(dissolve = true)
+            else -> Unit
         }
     }
 
@@ -905,17 +896,15 @@ class BarController(private val service: AccessibilityService) {
     fun closeMenu(now: Boolean = false, dissolve: Boolean = false, then: (() -> Unit)? = null) {
         val o = menu
         if (o == null) {
-            if (now) { leaving?.close(now = true); leaving = null; leavingKey = null; leavingThen = false }
+            if (now) popups.dropLeaving()?.close(now = true)
             then?.invoke()
             return
         }
-        menu = null
         // An earlier one still leaving goes at once: only one popup is ever folding away.
-        leaving?.close(now = true)
-        leaving = o; leavingKey = menuKey; leavingThen = then != null
+        popups.leave(then = then != null)?.close(now = true)
         menuKey = null
         o.close(dissolve = dissolve, now = now) {
-            if (leaving === o) { leaving = null; leavingKey = null; leavingThen = false }
+            popups.gone(o)
             then?.invoke()
         }
         Ticker.focusItem = null
