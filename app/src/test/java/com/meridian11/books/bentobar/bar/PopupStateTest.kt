@@ -44,6 +44,15 @@ class PopupStateTest {
         popups.reopened("w1", a)
         assertEquals("w1", popups.open)
         assertEquals(a, popups.openKey)
+        assertNull("it is up again, not leaving", foldAway())
+    }
+
+    @Test fun aClickOnAPopupStillFoldingWhileAnotherIsOpenOpensItAnew() {
+        // The one that is open dissolves first; the fold is only turned round with nothing open.
+        open(a, "w1")
+        foldAway()
+        open(b, "w2")
+        assertEquals(PopupCommand.Open, popups.toggle(a, 300L))
     }
 
     @Test fun theClickAfterThePressIsSpentForUnderASecond() {

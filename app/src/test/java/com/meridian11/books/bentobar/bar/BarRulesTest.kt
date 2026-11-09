@@ -191,6 +191,14 @@ class BarRulesTest {
         assertNull("placing the strip says SHOWN, NO_ROOM or STOPPED", d.status)
     }
 
+    @Test fun onlyAppWindowsMakeTheBarLookDifferent() {
+        // A big system window beside the free area: no cover, and nothing that gives the bar a look of its own.
+        val right = reading.copy(free = Box(1500, 0, 1681, 41))
+        val d = look(list(bar, strip, "71:t3:Tall:[0,0][800,900]"), now = right, last = right)
+        assertTrue(d.show)
+        assertNull(d.read)
+    }
+
     @Test fun aBarTheLookCouldNotReadRemembersNoWindows() {
         val before = replay(list(bar, strip, maximized)).last().neighbours
         val blind = look(list(strip, maximized), now = null, neighbours = before)
