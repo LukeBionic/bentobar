@@ -90,6 +90,7 @@ import androidx.compose.ui.unit.sp
 import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Pill
 import com.meridian11.books.bentobar.data.TextSize
+import com.meridian11.books.bentobar.items.AppItem
 import com.meridian11.books.bentobar.items.BarRoute
 import com.meridian11.books.bentobar.items.BarSlider
 import com.meridian11.books.bentobar.items.ItemState
@@ -645,7 +646,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
             val img = s.image
             if (img != null) {
                 Image(img.asImageBitmap(), null, Modifier.size(look.iconSp.value.dp),
-                    colorFilter = if (entry.item.optBool("mono", true) && entry.item.type == "app") ColorFilter.tint(color) else null)
+                    colorFilter = if (AppItem.mono.of(entry.item) && entry.item.type == "app") ColorFilter.tint(color) else null)
             } else if (s.dayNumber != null) {
                 DayBadge(s.dayNumber, look.iconSp, color, look.background)
             } else if (s.icon != null) {

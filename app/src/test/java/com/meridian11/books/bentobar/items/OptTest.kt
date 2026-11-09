@@ -1,5 +1,6 @@
 package com.meridian11.books.bentobar.items
 
+import com.meridian11.books.bentobar.SourceScan
 import com.meridian11.books.bentobar.data.ItemConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -72,5 +73,11 @@ class OptTest {
     @Test fun theLabelsTheBarShowsAreDeclaredWithTheirLimits() {
         assertEquals("Home", ClockItem.label.of(ItemConfig("c", "clock", options = mapOf("label" to "⁦Home⁩"))))
         assertEquals("0123456789abcdef", CountdownItem.label.of(ItemConfig("c", "countdown", options = mapOf("label" to "0123456789abcdefXYZ"))))
+    }
+
+    @Test fun theStripReadsAnAppsThemedIconOptionThroughItsDeclaration() {
+        // A default changed in one place would split the icon from its tint.
+        val byKey = SourceScan.sources.filter { """optBool("mono"""" in SourceScan.code(it) }.map { it.name }
+        assertEquals(emptyList<String>(), byKey)
     }
 }

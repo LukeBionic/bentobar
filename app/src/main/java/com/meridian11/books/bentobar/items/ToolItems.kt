@@ -344,7 +344,7 @@ fun AppPicker(selected: List<ComponentName>, multi: Boolean, onChange: (List<Com
 object AppItem : ItemType("app", R.string.item_app_title, Sym.ROCKET_LAUNCH, R.string.item_app_desc) {
     override val group = ItemGroup.TOOLS
     override val refreshMs = 60_000L
-    private val mono = Opt.bool("mono", true)
+    internal val mono = Opt.bool("mono", true)
 
     private data class Key(val cn: ComponentName, val mono: Boolean)
     private data class Resolved(val label: String, val icon: Bitmap?)
