@@ -37,6 +37,22 @@ class HidePathTest {
         assertTrue(stop.indexOf("closeMenu(now = true)") < stop.indexOf("Ticker.revealHidden = false"))
     }
 
+    @Test fun theDisplaysItemFollowsTheServiceSoKeepAwakeWhileConnectedHolds() {
+        val onConfig = code.substringAfter("private fun onConfig() {").substringBefore("\n    }\n")
+        assertTrue("onConfig must call DisplaysItem.follow(true): only it sets the rule's `ruled`", "DisplaysItem.follow(true)" in onConfig)
+        val stop = code.substringAfter("fun stop() {").substringBefore("/** Window events, logged")
+        val off = stop.indexOf("DisplaysItem.follow(false)")
+        assertTrue("stop() must call DisplaysItem.follow(false)", off >= 0)
+        assertTrue("follow(false) comes before Ticker.stop", off < stop.indexOf("Ticker.stop(\"bar\")"))
+    }
+
+    @Test fun anItemsMenuIsToldItIsOpeningBeforeItsFirstFrame() {
+        val toggle = code.substringAfter("fun toggleMenu(").substringBefore("val loc = strip.locationOnScreen()")
+        val close = toggle.indexOf("closeMenu(dissolve = true)")
+        assertTrue("toggleMenu closes the old popup first", close >= 0)
+        assertTrue("menuOpening runs after closeMenu(dissolve = true)", toggle.indexOf("menuOpening", close) > close)
+    }
+
     @Test fun itemsThatLeftOrDidNotFitLeaveNoBoxBehind() {
         val ui = File("src/main/java/com/meridian11/books/bentobar/bar/BarUi.kt").readText()
         assertTrue("items and the chevron report going", ui.contains("onDispose { glow.gone(entry.item.id); events.gone(entry.item.id) }") &&
