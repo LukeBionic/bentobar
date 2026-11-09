@@ -30,6 +30,54 @@ class ClipboardRulesTest {
         assertNull(ClipboardRules.clean("   \n  "))
     }
 
+    @Test fun aClipItsAppMarkedSensitiveIsNeverKept() {
+        // A password manager's copy: not in the menu, and not its first 20 characters in the status bar.
+        assertNull(ClipboardRules.recentText("hunter2-correct-horse", sensitive = true))
+        assertEquals("hunter2-correct-horse", ClipboardRules.recentText("hunter2-correct-horse", sensitive = false))
+    }
+
+    @Test fun aClipWithoutTextIsNotKept() {
+        // A copied file or link: its text is null, and nothing opens it to find out what it holds.
+        assertNull(ClipboardRules.recentText(null, sensitive = false))
+    }
+
+    @Test fun aSettingsExportIsNotASnippet() {
+        assertNull(ClipboardRules.recentText("""{"version":3,"items":[]}""", sensitive = false))
+        assertNull(ClipboardRules.recentText("""  {"version":3,"items":[]}""", sensitive = false))
+    }
+
+    @Test fun aLongClipIsKeptWholeAndOnlyItsPreviewIsCut() {
+        val long = "x".repeat(2_000)
+        val recent = ClipboardRules.recordRecent(emptyList(), long)
+        assertEquals(listOf(long), recent)
+        assertEquals(ClipboardRules.MENU_CHARS, ClipboardRules.preview(recent.single(), ClipboardRules.MENU_CHARS).length)
+    }
+
+    @Test fun aRecentClipComesBackAsItWasCopied() {
+        val spaced = "  indented first line\nsecond  \n"
+        assertEquals(listOf(spaced), ClipboardRules.recordRecent(emptyList(), spaced))
+    }
+
+    @Test fun aClipOverTheMemoryLimitIsNotKeptRatherThanKeptCut() {
+        val tooLong = "y".repeat(ClipboardRules.RECENT_CHARS + 1)
+        assertEquals(listOf("earlier"), ClipboardRules.recordRecent(listOf("earlier"), tooLong))
+        val fits = "y".repeat(ClipboardRules.RECENT_CHARS)
+        assertEquals(listOf(fits), ClipboardRules.recordRecent(emptyList(), fits))
+    }
+
+    @Test fun onlyWhatFitsWholeCanBePinned() {
+        // A pin is cut to MAX_CHARS in the layout, so a longer recent copy offers no pin: it would silently lose its end.
+        assertTrue(ClipboardRules.pinsWhole("  short  "))
+        assertTrue(ClipboardRules.pinsWhole("z".repeat(ClipboardRules.MAX_CHARS)))
+        assertFalse(ClipboardRules.pinsWhole("z".repeat(ClipboardRules.MAX_CHARS + 1)))
+    }
+
+    @Test fun nothingOpensWhatAClipPointsTo() {
+        // coerceToText opens a content:// clip's provider and reads the stream, on the main thread.
+        val readers = java.io.File("src/main/java").walkTopDown().filter { it.isFile && it.extension == "kt" && "coerceToText" in it.readText() }.map { it.path }.toList()
+        assertEquals(emptyList<String>(), readers)
+    }
+
     @Test fun aSavedPasteOptionFromBeforeItWasRemovedChangesNothing() {
         val plain = ItemConfig("c1", "clipboard")
         val old = plain.copy(options = mapOf("pasteOnClick" to "true"))

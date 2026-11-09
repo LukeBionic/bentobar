@@ -1,5 +1,6 @@
 package com.meridian11.books.bentobar.items
 
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -65,12 +66,13 @@ object ClipboardItem : ItemType("clipboard", R.string.item_clipboard_title, Sym.
     internal fun readPrimaryClip() {
         if (staged != null) return
         val cm = clipboard() ?: return
+        // The clip's own text only: nothing is opened on the main thread to read what a copied file or link holds.
         val text = runCatching {
-            val clip = cm.primaryClip
-            if (clip != null && clip.itemCount > 0) clip.getItemAt(0)?.coerceToText(Env.app)?.toString() else null
+            val clip = cm.primaryClip?.takeIf { it.itemCount > 0 } ?: return@runCatching null
+            val sensitive = clip.description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) == true
+            ClipboardRules.recentText(clip.getItemAt(0)?.text, sensitive)
         }.getOrNull()
-        // Never record a BentoBar settings export blob as a snippet.
-        if (text != null && !text.trimStart().startsWith("""{"version":""")) {
+        if (text != null) {
             val next = ClipboardRules.recordRecent(recent.value, text)
             if (next != recent.value) {
                 recent.value = next
@@ -155,7 +157,7 @@ object ClipboardItem : ItemType("clipboard", R.string.item_clipboard_title, Sym.
                     MenuEntry(
                         icon = Sym.CONTENT_COPY,
                         label = line,
-                        trailing = if (pins.size < ClipboardRules.MOST_PINS) {
+                        trailing = if (pins.size < ClipboardRules.MOST_PINS && ClipboardRules.pinsWhole(snippet)) {
                             {
                                 SmallIconButton(Sym.PUSH_PIN, stringResource(R.string.clipboard_pin)) {
                                     Store.updateItem(item.id) { ClipboardRules.addPin(it, snippet) }

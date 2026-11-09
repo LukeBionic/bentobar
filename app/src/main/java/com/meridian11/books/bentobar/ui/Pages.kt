@@ -213,7 +213,8 @@ fun LookPage() {
                 Toast.makeText(context, res.getString(R.string.look_copied), Toast.LENGTH_SHORT).show()
             }) { Text(stringResource(R.string.look_copy)) }
             OutlinedButton(onClick = {
-                val text = context.getSystemService(ClipboardManager::class.java)?.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
+                // Its own text only (a layout always is): a copied file isn't opened on the main thread to find out.
+                val text = context.getSystemService(ClipboardManager::class.java)?.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
                 Toast.makeText(context, res.getString(if (Store.import(text)) R.string.look_restored else R.string.look_not_settings), Toast.LENGTH_SHORT).show()
             }) { Text(stringResource(R.string.look_paste)) }
         }
