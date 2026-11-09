@@ -87,7 +87,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.meridian11.books.bentobar.data.Display
 import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Pill
 import com.meridian11.books.bentobar.data.TextSize
@@ -310,8 +309,8 @@ fun Strip(
             // Over the strip's own pill and under every item (an alert's red capsule is drawn over it). Its place is
             // read here, at draw time, so a frame of its way draws it again and recomposes nothing.
             .drawBehind { with(glow) { draw(look.fg) } }
-            // Without a pill the ends are only room for the highlight: an empty strip stays 0 wide, which is how the
-            // controller knows to make its window invisible rather than leave transparent nothing on screen.
+            // Without a pill the ends are only room for the highlight: with nothing listed the strip stays 0 wide, and its
+            // window a pixel wide while it is invisible ([StripContent] says when that is).
             .padding(horizontal = if (look.pill == Pill.NONE && visible.isEmpty() && revealed.isEmpty() && !showChevron) 0.dp else STRIP_PILL_PADDING),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -551,13 +550,10 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
         Tone.ACCENT -> look.accent
         Tone.NORMAL -> look.fg
     }
-    val display = entry.item.display
-    // A slider takes the text's place ("Icon and text" draws icon and slider, "Text" the slider alone);
-    // shown as an icon only, the item has none.
-    val slider = s.slider?.takeIf { display != Display.ICON }
-    // A route line takes the icon's place ("Icon and text" draws line and words, "Icon" the line alone);
-    // shown as text only, the item has none.
-    val route = s.route?.takeIf { display.line }
+    // What this item draws is [StripContent]'s to say, for the strip's emptiness as much as here.
+    val parts = StripContent.parts(s, entry.item.display)
+    val slider = parts.slider
+    val route = parts.route
     // While the pointer holds the slider: the level under it. Otherwise the item's own, which is the real one.
     var held by remember { mutableStateOf<Float?>(null) }
     // A held slider keeps the strip's highlight on its item, wherever the pointer goes, until it lets go.
@@ -568,8 +564,8 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
     }
     val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == LayoutDirection.Rtl
     val context by rememberUpdatedState { events.context(entry.item, bounds) }
-    val showIcon = route == null && (display != Display.TEXT || s.text.isNullOrEmpty())
-    val showText = slider == null && display != Display.ICON && !s.text.isNullOrEmpty()
+    val showIcon = parts.icon
+    val showText = parts.text
     Row(
         Modifier.fillMaxHeight()
             // The slot is read during placement (before this frame draws), the bounds after layout.

@@ -1,0 +1,146 @@
+package com.meridian11.books.bentobar.bar
+
+import com.meridian11.books.bentobar.data.Display
+import com.meridian11.books.bentobar.data.ItemConfig
+import com.meridian11.books.bentobar.data.Pill
+import com.meridian11.books.bentobar.items.BarRoute
+import com.meridian11.books.bentobar.items.BarSlider
+import com.meridian11.books.bentobar.items.ItemState
+import com.meridian11.books.bentobar.items.Tone
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+
+/**
+ * Whether the strip has anything on the screen: the one rule behind an empty or blank strip's invisible window. It is
+ * never decided from how many entries there are: an entry can draw nothing (findings F08 and F25).
+ */
+class StripContentTest {
+    private fun draws(type: String = "text", display: Display = Display.ICON_AND_TEXT, state: ItemState) = StripContent.draws(type, display, state)
+    private fun entry(id: String, state: ItemState, type: String = "text", display: Display = Display.ICON_AND_TEXT) =
+        StripEntry(ItemConfig(id, type, display = display), state)
+    private val blank = ItemState(icon = "", text = null)
+
+    // ---- what an entry draws --------------------------------------------------------------------------
+
+    /** A spacer is its gap, and draws only its line. */
+    @Test fun aSpacerDrawsOnlyItsLine() {
+        assertFalse(draws("spacer", state = ItemState(gapDp = 24, divider = false)))
+        assertTrue(draws("spacer", state = ItemState(gapDp = 24, divider = true)))
+    }
+
+    /** A text item with no icon chosen, shown as an icon, has a place in the row and nothing in it. */
+    @Test fun aTextItemShownAsTheIconItDoesNotHaveDrawsNothing() {
+        assertFalse(draws(display = Display.ICON, state = ItemState(icon = "", text = "hello")))
+        assertFalse(draws(display = Display.ICON, state = ItemState(icon = null, text = "hello")))
+    }
+
+    @Test fun anIconOrAnImageOrADayNumberIsDrawn() {
+        assertTrue(draws(display = Display.ICON, state = ItemState(icon = "star")))
+        assertTrue(draws(display = Display.ICON, state = ItemState(dayNumber = 9)))
+    }
+
+    /** Words are drawn, in any way that shows text; words made of nothing but spaces are not. */
+    @Test fun blankTextIsNothing() {
+        assertTrue(draws(display = Display.TEXT, state = ItemState(icon = "", text = "hello")))
+        assertTrue(draws(display = Display.ICON_AND_TEXT, state = ItemState(icon = "", text = "hello")))
+        assertFalse(draws(display = Display.TEXT, state = ItemState(icon = "", text = "   ")))
+        assertFalse(draws(display = Display.TEXT, state = ItemState(icon = "", text = "")))
+    }
+
+    /** Shown as text alone an icon is not drawn, unless there are no words to show instead. */
+    @Test fun anIconIsDrawnOnlyWhereItsItemShowsOne() {
+        assertFalse(draws(display = Display.TEXT, state = ItemState(icon = "star", text = "   ")))
+        assertTrue(draws(display = Display.TEXT, state = ItemState(icon = "star", text = "")))
+    }
+
+    @Test fun aSliderOrARouteLineIsDrawnWhereTheItemShowsOne() {
+        val slider = ItemState(icon = "", slider = BarSlider(0.5f))
+        assertTrue(draws(display = Display.TEXT, state = slider))
+        assertFalse("shown as an icon only, it has none", draws(display = Display.ICON, state = slider))
+        val route = ItemState(icon = "", route = BarRoute(0.3f))
+        assertTrue(draws(display = Display.ICON, state = route))
+        assertFalse("shown as text only, it has none", draws(display = Display.TEXT, state = route))
+    }
+
+    /** An alert's red capsule is drawn around the item, whatever is in it. */
+    @Test fun anAlertsCapsuleIsDrawnWithNothingInIt() {
+        assertTrue(draws(display = Display.ICON, state = ItemState(icon = "", tone = Tone.ALERT)))
+    }
+
+    // ---- what the strip draws -------------------------------------------------------------------------
+
+    /** Finding F25: a transparent window for items that draw nothing is what Play Protect flags. */
+    @Test fun aStripOfOnlyBlankItemsDrawsNothingHoweverManyThereAre() {
+        val spacers = List(5) { entry("s$it", ItemState(gapDp = 16), type = "spacer") }
+        assertFalse(StripContent.drawn(spacers, chevron = false, pill = Pill.NONE))
+        assertFalse(StripContent.drawn(listOf(entry("t", blank, display = Display.ICON)), chevron = false, pill = Pill.NONE))
+    }
+
+    @Test fun oneThingDrawnIsEnough() {
+        val blanks = listOf(entry("s", ItemState(gapDp = 16), type = "spacer"))
+        assertTrue(StripContent.drawn(blanks + entry("t", ItemState(icon = "star"), display = Display.ICON), chevron = false, pill = Pill.NONE))
+    }
+
+    @Test fun nothingListedMeansNothingDrawn() {
+        assertFalse(StripContent.drawn(emptyList(), chevron = false, pill = Pill.NONE))
+    }
+
+    @Test fun theChevronIsDrawn() {
+        assertTrue(StripContent.drawn(emptyList(), chevron = true, pill = Pill.NONE))
+    }
+
+    /** With a pill, the strip's own padding keeps it on the screen as an empty capsule: the behaviour it has always had. */
+    @Test fun aPillIsDrawnWithNothingInIt() {
+        assertTrue(StripContent.drawn(emptyList(), chevron = false, pill = Pill.SUBTLE))
+        assertTrue(StripContent.drawn(emptyList(), chevron = false, pill = Pill.SOLID))
+    }
+
+    // ---- what it comes to -----------------------------------------------------------------------------
+
+    @Test fun nothingDrawnMeansEmptyWhateverTheWidth() {
+        assertTrue(StripContent.empty(width = 120, drawn = false))
+        assertTrue(StripContent.empty(width = 0, drawn = false))
+        assertFalse(StripContent.empty(width = 120, drawn = true))
+        assertTrue("no width at all has nothing to show", StripContent.empty(width = 0, drawn = true))
+    }
+
+    /** Finding F59: an empty strip is not "live" (it can have room or not: either way there is nothing to see). */
+    @Test fun theStatusSaysEmptyBeforeItSaysAnythingElse() {
+        assertEquals(BarStatus.EMPTY, StripContent.status(empty = true, noRoom = true))
+        assertEquals(BarStatus.EMPTY, StripContent.status(empty = true, noRoom = false))
+        assertEquals(BarStatus.NO_ROOM, StripContent.status(empty = false, noRoom = true))
+        assertEquals(BarStatus.SHOWN, StripContent.status(empty = false, noRoom = false))
+    }
+
+    // ---- what only reading the code can show ------------------------------------------------------------
+
+    private val ui = File("src/main/java/com/meridian11/books/bentobar/bar/BarUi.kt").readText()
+    private val code = File("src/main/java/com/meridian11/books/bentobar/bar/BarService.kt").readText()
+
+    @Test fun theStripAndTheRuleAgreeOnWhatAnItemDraws() {
+        assertTrue("ItemView draws what StripContent says", "StripContent.parts(" in ui && "val showIcon =" in ui)
+        assertFalse("and works none of it out itself", Regex("""val showText = slider == null""").containsMatchIn(ui))
+    }
+
+    /** Finding F08: while invisible nothing draws, and Compose's remeasure waits for a draw, so it is asked for by hand. */
+    @Test fun aStripMadeInvisibleStillMeasuresWhatItsCompositionChanged() {
+        val host = code.substringAfter("private fun StripHost()").substringBefore("private var stripEmpty")
+        assertTrue(host, Regex("""SideEffect \{ if \(stripEmpty\) view\.requestLayout\(\) \}""").containsMatchIn(host))
+        assertTrue(host, "StripContent.empty(w, drawn)" in host)
+    }
+
+    /** One rule, and the window is a single call: the exact-width invisible window stays. */
+    @Test fun theStripGoesInvisibleOnlyThroughTheOneRule() {
+        assertFalse("nothing asks how many entries there are", Regex("""\.isEmpty\(\)\s*\)?\s*strip""").containsMatchIn(code))
+        val apply = code.substringAfter("private fun applyWidth(").substringBefore("private var dragFrom")
+        assertTrue(apply, "strip.setContentVisible(!empty)" in apply)
+        assertEquals(1, Regex("""setContentVisible""").findAll(code).count())
+    }
+
+    @Test fun debugDumpSaysWhetherTheStripIsEmpty() {
+        assertTrue("empty=\$stripEmpty" in code)
+    }
+}

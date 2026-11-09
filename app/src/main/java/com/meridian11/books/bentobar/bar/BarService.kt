@@ -21,10 +21,12 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.meridian11.books.bentobar.data.HiddenMode
 import com.meridian11.books.bentobar.data.shows
@@ -402,7 +404,7 @@ class BarController(private val service: AccessibilityService) {
         heightDp.value = (s.bar.height() / density).dp
         val where = "free=${s.free.toShortString()} x=${p.x} maxW=${maxWidth.intValue} [${s.summary}]"
         if (where != lastPlace) { trace("place $where"); lastPlace = where }
-        BarStatus.current.value = if (maxWidth.intValue == 0) BarStatus.NO_ROOM else BarStatus.SHOWN
+        BarStatus.current.value = status()
         if (!strip.shown) {
             stripEmpty = false // a new window starts visible; its first measure says whether it has content
             strip.show { StripHost() }
@@ -443,13 +445,22 @@ class BarController(private val service: AccessibilityService) {
         val overflow by BarOverflow.ids.collectAsState()
         // Without the ‹ button there's no way to fold hidden items back, so they stay folded.
         val open = expanded.value && cfg.hiddenMode != HiddenMode.SHOW_ALL && !cfg.presenting
+        val shownEntries = entries(visible)
+        val revealedEntries = if (open) entries(hidden) else emptyList()
+        // Items that don't fit are offered in the ‹ menu, so ‹ shows for them too.
+        val showChevron = cfg.presenting || overflow.isNotEmpty() || hidden.isNotEmpty()
+        // The one rule for an empty strip: what it puts on the screen, never how many entries it has.
+        val drawn = StripContent.drawn(shownEntries + revealedEntries, showChevron, look.value.pill)
+        // While the window is invisible nothing draws, and the remeasure Compose hands to the next draw would wait for it for
+        // good. Measuring still runs, if it is asked for: the rule above is heard as soon as the composition changes.
+        val view = LocalView.current
+        SideEffect { if (stripEmpty) view.requestLayout() }
         MeasuredStrip(bias = when (cfg.position) { Position.RIGHT -> 1f; Position.CENTER -> 0f; Position.LEFT -> -1f },
-            onWidth = { w -> if (w != strip.params.width || (w <= 0) != stripEmpty) main.post { applyWidth(w) } }) {
+            onWidth = { w -> val empty = StripContent.empty(w, drawn); if (w != strip.params.width || empty != stripEmpty) main.post { applyWidth(w, empty) } }) {
             Strip(
-                visible = entries(visible),
-                revealed = if (open) entries(hidden) else emptyList(),
-                // Items that don't fit are offered in the ‹ menu, so ‹ shows for them too.
-                showChevron = cfg.presenting || overflow.isNotEmpty() || hidden.isNotEmpty(),
+                visible = shownEntries,
+                revealed = revealedEntries,
+                showChevron = showChevron,
                 chevronAlways = cfg.presenting || hidden.isNotEmpty(),
                 chevronReservePx = (30 * density).toInt(),
                 expanded = open,
@@ -467,18 +478,20 @@ class BarController(private val service: AccessibilityService) {
 
     /** Sizes the strip window to its content (an exact width, never WRAP_CONTENT). */
     /**
-     * Nothing to draw (every item off, or only rule items that don't apply now): the strip's window
-     * is made invisible rather than left up empty and a pixel wide, which is what Android's threat
+     * Nothing to draw ([StripContent.empty]: every item off, only rule items that don't apply now, only blank items): the
+     * strip's window is made invisible rather than left up empty, which is what Android's threat
      * detection looks for ("imperceptible content" from an accessibility service). Its content keeps
-     * being measured, so it shows again as soon as there's something to draw.
+     * being measured, so it shows again as soon as there's something to draw ([StripHost] asks for that measure).
      */
     private var stripEmpty = false
 
-    private fun applyWidth(w: Int) {
-        val empty = w <= 0
+    private fun status() = StripContent.status(empty = strip.shown && stripEmpty, noRoom = maxWidth.intValue == 0)
+
+    private fun applyWidth(w: Int, empty: Boolean) {
         if (empty != stripEmpty) {
             stripEmpty = empty; strip.setContentVisible(!empty); trace("strip ${if (empty) "empty" else "has content"}"); awake.update()
             colors.contentChanged(empty)
+            if (started && strip.shown) BarStatus.current.value = status()
         }
         val width = w.coerceAtLeast(1)
         if (strip.params.width == width) return
@@ -631,7 +644,7 @@ class BarController(private val service: AccessibilityService) {
     fun debug(cmd: List<String>): String {
         fun first(type: String) = Store.config.value.items.firstOrNull { it.type == type || it.id == type }
         return when (cmd.firstOrNull()) {
-            "dump" -> "snap=$snap look=${look.value} expanded=${expanded.value} menu=${menus.menuKey} shown=${strip.shown} placed=$placed"
+            "dump" -> "snap=$snap look=${look.value} expanded=${expanded.value} menu=${menus.menuKey} shown=${strip.shown} empty=$stripEmpty placed=$placed"
             "open", "ctx" -> {
                 val item = first(cmd.getOrElse(1) { "" }) ?: return "no such item"
                 val at = placed[item.id] ?: return "item not drawn yet"

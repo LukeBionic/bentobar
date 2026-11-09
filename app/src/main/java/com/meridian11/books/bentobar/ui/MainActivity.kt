@@ -208,6 +208,7 @@ class MainActivity : ComponentActivity() {
                             else -> when (status) {
                                 BarStatus.STOPPED -> R.string.status_starting
                                 BarStatus.NO_ROOM -> R.string.status_no_room
+                                BarStatus.EMPTY -> R.string.status_empty
                                 BarStatus.NO_BAR -> R.string.status_no_bar
                                 BarStatus.COVERED -> R.string.status_covered
                                 else -> R.string.status_live

@@ -19,6 +19,8 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     places the strip, hides it (fullscreen, keyguard, screen off, a shade covering the bar), and
     has adb `debug()` hooks.
   - `bar/MenuCoordinator.kt`: the strip's popups and its tooltip: when they come and go; `PopupState` decides.
+  - `bar/StripContent.kt`: what an item draws and whether the strip draws anything (pure, unit-tested): the one rule for
+    an empty or blank strip, whose window is made invisible. Never from how many entries it has: an entry can draw nothing.
   - `bar/KeepAwake.kt`: keep awake: `FLAG_KEEP_SCREEN_ON` on the strip's window, a screen wake lock while it has none.
   - `bar/ColorReader.kt`: the strip's colours: when the bar is read (`ColorWatch` says), what a reading makes of the
     look (`StripLook`), the hints when there is no reading. The screenshot itself is `StatusBarScan.shoot`.
