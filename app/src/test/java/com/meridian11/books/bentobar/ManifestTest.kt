@@ -111,6 +111,28 @@ class ManifestTest {
         for (service in application.all("service")) assertNotNull(service.attr("name"), service.attr("permission").takeIf { it.isNotEmpty() })
     }
 
+    /**
+     * The same of what is built: a library can bring an exported activity or service along (ui-tooling's PreviewActivity
+     * once did, in debug), and src/main's manifest would not show it. An exported part is one marked so, or with an
+     * intent filter and no say either way.
+     */
+    @Test fun noLibraryBringsAnExportedPartAlong() {
+        val type = BuildConfig.BUILD_TYPE
+        val merged = xml("build/intermediates/merged_manifests/$type/process${type.replaceFirstChar { it.uppercase() }}Manifest/AndroidManifest.xml")
+        val app = merged.all("application").single()
+        val prefix = BuildConfig.APPLICATION_ID
+        val exported = (app.all("activity") + app.all("activity-alias") + app.all("service") + app.all("receiver") + app.all("provider"))
+            .filter { it.attr("exported") == "true" || (!it.hasAttributeNS(android, "exported") && it.all("intent-filter").isNotEmpty()) }
+            .map { it.attr("name").removePrefix(prefix) }.toSet()
+        // Debug builds add the adb test hooks from src/debug, guarded by the shell's DUMP permission; a release has none.
+        val hooks = if (type == "debug") setOf(".util.DebugReceiver", ".util.BarFlipActivity") else emptySet()
+        assertEquals(setOf(".ui.MainActivity", ".ui.BarMenuActivity", ".bar.BarService", ".tile.BarTile", ".tile.AwakeTile", ".tile.TimerTile",
+            ".items.MediaAccess", "androidx.profileinstaller.ProfileInstallReceiver") + hooks, exported)
+        // The one a library adds: AndroidX's profile installer, which only the shell (it holds DUMP) can start.
+        val installer = app.all("receiver").single { it.attr("name") == "androidx.profileinstaller.ProfileInstallReceiver" }
+        assertEquals("android.permission.DUMP", installer.attr("permission"))
+    }
+
     // The accessibility service's own config (res/xml/accessibility_service.xml). AGENTS.md "Least privilege" and the Play
     // declaration both rest on it, so each rule below is one a change has to make on purpose.
     private val serviceConfig = xml("src/main/res/xml/accessibility_service.xml")

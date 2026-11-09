@@ -26,7 +26,7 @@ android {
                 storeFile = keyFile
                 val pw = keyPassFile.readText().trim()
                 storePassword = pw
-                keyAlias = "bentobar" // the release key made on 2026-09-30 (the DiscoBar-era key was retired)
+                keyAlias = "bentobar" // the Meridian11 release key, made on 2026-11-03 for 1.7 (the earlier keys were retired)
                 keyPassword = pw
             }
         }
@@ -69,18 +69,18 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime)
-    implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.androidx.savedstate)
     implementation(libs.kotlinx.serialization.json)
+    // Used directly (flows, launch); declared so a library dropping it cannot break the build.
+    implementation(libs.kotlinx.coroutines.core)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit)
     // The Compose tests alone (see the build type): Robolectric hosts the composables on the JVM, ui-test drives them, and
     // ui-test-manifest declares the empty activity they are set into.
     add("testComposeTestImplementation", platform(libs.androidx.compose.bom))
