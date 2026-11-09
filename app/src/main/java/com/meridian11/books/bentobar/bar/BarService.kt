@@ -144,6 +144,11 @@ class BarController(private val service: AccessibilityService) {
     /** A click outside the strip while hidden items are out folds them away, unless a menu is open (it closes itself). */
     private fun outsideClick() {
         if (menus.menuKey != null || !expanded.value) return
+        fold()
+    }
+
+    /** Hidden items go back behind ‹ and stay there: with their pin gone too, or the next start of the service opens them with no click. */
+    private fun fold() {
         expanded.value = false; pinned = false
         if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
     }
@@ -200,8 +205,7 @@ class BarController(private val service: AccessibilityService) {
             if (sliding) { main.postDelayed(this, 300); return }
             if (!hovering && menus.menuKey == null && expanded.value) {
                 Log.i(tag, "collapse (pinned=$pinned autoCollapse=${Store.config.value.autoCollapseSec}s)")
-                expanded.value = false; pinned = false
-                if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
+                fold()
             }
         }
     }
@@ -303,7 +307,7 @@ class BarController(private val service: AccessibilityService) {
         DisplaysItem.follow(true)
         colors.onConfig()
         // Switched to Show everything (or presenting) with hidden items out: nothing can fold them back.
-        Store.config.value.let { if ((it.hiddenMode == HiddenMode.SHOW_ALL || it.presenting) && expanded.value) { expanded.value = false; pinned = false } }
+        Store.config.value.let { if ((it.hiddenMode == HiddenMode.SHOW_ALL || it.presenting) && expanded.value) fold() }
         colors.applyLook()
         if (Ticker.running) Ticker.refresh()
         scan()
@@ -586,7 +590,8 @@ class BarController(private val service: AccessibilityService) {
         override fun wheel(up: Boolean) {
             val cfg = Store.config.value
             if (cfg.presenting || cfg.hiddenMode == HiddenMode.SHOW_ALL || hiddenItems().isEmpty()) return
-            if (up != expanded.value) { expanded.value = up; pinned = false }
+            if (up == expanded.value) return
+            if (up) { expanded.value = true; pinned = false } else fold()
         }
 
         override fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) = menus.itemHover(item, at, inside, sliding)

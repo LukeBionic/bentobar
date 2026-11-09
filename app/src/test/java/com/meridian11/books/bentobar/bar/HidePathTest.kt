@@ -1,5 +1,6 @@
 package com.meridian11.books.bentobar.bar
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -50,6 +51,16 @@ class HidePathTest {
 
     @Test fun whatTheHoverHeldOutFoldsAwayButWhatWasPinnedStays() {
         assertTrue(hide, Regex("""if \(!pinned && expanded\.value\) expanded\.value = false""").containsMatchIn(hide))
+    }
+
+    /** Hidden items folded by anything but the hide path stay folded: the pin goes with them, or the next start of the service opens them with no click. */
+    @Test fun whatFoldsHiddenItemsAlsoClearsTheirPin() {
+        val fold = code.substringAfter("private fun fold() {").substringBefore("\n    }\n")
+        assertTrue(fold, "expanded.value = false" in fold && "pinned = false" in fold && "pinnedOpen = false" in fold)
+        assertEquals("outside the fold, only the hide path turns them off (and there nothing was pinned)", 2,
+            Regex("""expanded\.value = false""").findAll(code).count())
+        val wheel = code.substringAfter("override fun wheel(up: Boolean) {").substringBefore("\n        }\n")
+        assertTrue(wheel, "fold()" in wheel)
     }
 
     @Test fun stoppingLeavesNothingRevealedInTheProcesssTicker() {
