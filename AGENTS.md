@@ -104,6 +104,10 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     address. `Http.get` refuses unless the service is switched on, an item that uses it is outside
     Off and something that shows items is on screen, and never runs on the main thread. A query can
     hold a key: a `Request` prints as host and path only, and no exception leaves `HttpTransport`.
+  - `data/LayoutIntents.kt`: what a command does to an item's place (`show`, `hide`, `turnOff`, `putIn`, `setWhenActive`), as pure
+    steps from one layout to the next. A screen calls `Store.update { it.hide(id) }` and writes no section or rule of its own
+    (`LayoutIntentsTest` holds them to it). `stripPlan` (in `Model.kt`) is the one choice of what the strip and the settings
+    preview show (`StripPlanTest`).
   - `data/`: `Model.kt` (`BarConfig`, `ItemConfig`, `Section`…) and `Store` (JSON in
     SharedPreferences, a process-wide StateFlow shared by the service and settings; `Store.open` takes a `Prefs`, so a test
     runs it on a map). `Layout.kt` holds `readLayout`, the one reader of a stored or pasted layout: decode, migrate, repeated
@@ -122,6 +126,12 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     `Controls` (shared UI pieces).
   - "Show when…": a type's `trigger` (in `ItemType.kt`) words its pop-out rule, and its `Threshold`
     is the one source of the option key and default for both `state()` and the settings slider.
+    An option generally is an `Opt` (`items/Opt.kt`): the key, the default and the checks on what a layout may say, declared
+    once on the type and read by the bar and the settings alike; text from a layout is cleaned there. Older types still read
+    by key and move over as they are touched.
+  - `items/Holders.kt`: who needs what only runs while someone does. `Calendar` is held by the Calendar and Next meeting
+    items while they are live and by the Live Update chip while it can be a meeting's (it works with the service off, so it
+    can't hang on `onLive` alone); a minute after the last holder left it stops observing the provider and forgets what it read.
   - `tile/Tiles.kt`: the BentoBar, Keep awake and Timer tiles.
   - `util/`: `Sym.kt` (generated), `Ui.kt` (fonts, `SymIcon`), `Fmt.kt`, `Dates.kt` (locale-aware dates
     and times from skeletons), `Now.kt` (the clock for ages and countdowns, which a debug build's
