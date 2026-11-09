@@ -58,6 +58,7 @@ class FakeHttp : Transport {
             try {
                 return test(fake)
             } finally {
+                Http.clock = { System.nanoTime() / 1_000_000 }
                 Http.transport = HttpTransport()
                 Http.allowed = { false }
                 Http.connected = { true }

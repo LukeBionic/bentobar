@@ -1,6 +1,8 @@
 package com.meridian11.books.bentobar.net
 
+import com.meridian11.books.bentobar.data.Online
 import java.util.concurrent.atomic.AtomicIntegerArray
+import java.util.concurrent.atomic.AtomicLongArray
 
 /**
  * The only hosts BentoBar may ask. A request names one of these; there is no way to name another,
@@ -86,7 +88,11 @@ object Http {
     const val USER_AGENT = "BentoBar"
     const val CONNECT_MS = 4_000
     const val READ_MS = 6_000
-    /** A whole request, from asking to the last byte: an answer that trickles in is given up, so no load hangs on one. */
+    /**
+     * A whole request, from asking to the last byte, checked between reads: an answer that trickles in is given up, so no load
+     * hangs on one. One read already under way can't be cut off without a watchdog thread, so the worst case is this and one
+     * stalled read ([READ_MS]), about 21 s, plus the name lookup, which no timeout covers.
+     */
     const val TOTAL_MS = 15_000
     const val MAX_BYTES = 256 * 1024
 
@@ -99,8 +105,18 @@ object Http {
     /** Gets one line per request: "GET host/path -> ok" or "-> STATUS 429". Never a query, never a reply's text. */
     @Volatile var log: (String) -> Unit = {}
     @Volatile var transport: Transport = HttpTransport()
+    /** The time since boot, milliseconds: how the wait a service asked for is counted. */
+    @Volatile var clock: () -> Long = { System.nanoTime() / 1_000_000 }
+
+    /**
+     * A 429 that names no time: long enough that the rest of one pass (ten stocks, in seconds) isn't sent, short enough
+     * not to change what an item does by itself: each service's own pace, and a press of Try again (ten seconds at the soonest).
+     */
+    private const val SLOW_DOWN_SEC = 10L
 
     private val counts = AtomicIntegerArray(Host.entries.size)
+    /** Per service, the moment by [clock] before which nothing is sent to it: set from a 429 or a Retry-After. 0: none. */
+    private val notBefore = AtomicLongArray(Online.Service.entries.size)
 
     /**
      * Asks, and waits for the answer: call it from a background load ([com.meridian11.books.bentobar.items.Refresher],
@@ -112,6 +128,13 @@ object Http {
         if (!connected()) return Reply.Failed(Why.OFFLINE, sent = false)
         // Before anything is counted as sent: the counter must not say requests left when the transport would refuse them.
         if (HttpTransport.address(request) == null) { log("GET $request refused: not a plain path"); return Reply.Failed(Why.REFUSED, sent = false) }
+        val service = Online.serviceOf(request.host).ordinal
+        val wait = notBefore.get(service) - clock()
+        if (wait > 0) {
+            // One 429 speaks for the whole service: Finnhub says it about one symbol, and the other nine are not sent in the same pass.
+            log("GET $request held: the service asked to wait")
+            return Reply.Failed(Why.STATUS, 429, retryAfterSec = (wait + 999) / 1000, sent = false)
+        }
         counts.incrementAndGet(request.host.ordinal)
         val reply = try {
             transport.get(request)
@@ -120,8 +143,18 @@ object Http {
             Reply.Failed(Why.UNREADABLE)
         }
         log("GET $request -> $reply")
+        if (reply is Reply.Failed) noteWait(service, reply)
         return reply
     }
+
+    /** What a service asked for, kept for every request to it: at [Reply.Failed.retryAfterSec], or for a 429 that names none, [SLOW_DOWN_SEC]. */
+    private fun noteWait(service: Int, reply: Reply.Failed) {
+        val seconds = reply.retryAfterSec ?: if (reply.status == 429) SLOW_DOWN_SEC else return
+        if (seconds > 0) notBefore.accumulateAndGet(service, clock() + seconds * 1000, ::maxOf)
+    }
+
+    /** A network that can carry a request: there is one and it isn't a sign-in page's. Validated isn't asked for: Android's own check fails on some working networks. */
+    fun usable(hasNetwork: Boolean, captivePortal: Boolean): Boolean = hasNetwork && !captivePortal
 
     private fun refused(request: Request, why: String): Reply {
         log("GET $request refused: $why")
@@ -131,5 +164,9 @@ object Http {
     /** How many requests really went out to [host] since the app started (or [resetCounts]): for the debug hook and for tests. */
     fun sent(host: Host): Int = counts.get(host.ordinal)
 
-    fun resetCounts() { for (i in 0 until counts.length()) counts.set(i, 0) }
+    fun resetCounts() {
+        for (i in 0 until counts.length()) counts.set(i, 0)
+        // And the waits: `net reset` starts over, and no test inherits another's 429.
+        for (i in 0 until notBefore.length()) notBefore.set(i, 0)
+    }
 }

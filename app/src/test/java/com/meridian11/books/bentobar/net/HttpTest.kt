@@ -161,4 +161,88 @@ class HttpTest {
         assertEquals("OFFLINE", Reply.Failed(Why.OFFLINE).toString())
         assertEquals("ok", Reply.Ok("""{"secret":"text"}""").toString())
     }
+
+    // ---- rate limits, per service ------------------------------------------------------------------
+
+    private var now = 1_000_000L
+    private val quote = Request(Host.FINNHUB, "/api/v1/quote", listOf("symbol" to "AAPL"))
+    private val other = Request(Host.FINNHUB, "/api/v1/quote", listOf("symbol" to "MSFT"))
+
+    private fun clocked() { Http.clock = { now } }
+
+    @After fun clockBack() { Http.clock = { System.nanoTime() / 1_000_000 } }
+
+    @Test fun oneTooManyRequestsHoldsTheWholeServiceAndSaysHowLong() {
+        clocked()
+        fake.fail(Host.FINNHUB, "/api/v1/quote", Why.STATUS, 429, retryAfterSec = 30)
+        assertEquals(429, (Http.get(quote) as Reply.Failed).status)
+        val held = Http.get(other) as Reply.Failed
+        assertEquals(1, fake.asked.size)
+        assertFalse(held.sent)
+        assertEquals(30L, held.retryAfterSec)
+        assertEquals(429, held.status)
+        assertEquals(1, Http.sent(Host.FINNHUB))
+    }
+
+    @Test fun theWaitEndsWhenItEnds() {
+        clocked()
+        fake.fail(Host.FINNHUB, "/api/v1/quote", Why.STATUS, 429, retryAfterSec = 30)
+        Http.get(quote)
+        now += 29_000
+        assertEquals(1L, (Http.get(other) as Reply.Failed).retryAfterSec)
+        now += 1_001
+        Http.get(other)
+        assertEquals("the second request went out", 2, fake.asked.size)
+    }
+
+    @Test fun aRateLimitDoesNotCrossToAnotherService() {
+        clocked()
+        fake.fail(Host.FINNHUB, "/api/v1/quote", Why.STATUS, 429, retryAfterSec = 30)
+        Http.get(quote)
+        Http.get(forecast)
+        assertEquals(2, fake.asked.size)
+    }
+
+    @Test fun aServicesHostsShareOneWait() {
+        clocked()
+        fake.fail(Host.OPEN_METEO, "/v1/forecast", Why.STATUS, 429, retryAfterSec = 30)
+        Http.get(forecast)
+        val air = Http.get(Request(Host.OPEN_METEO_AIR, "/v1/air-quality")) as Reply.Failed
+        assertFalse(air.sent)
+        assertEquals(1, fake.asked.size)
+    }
+
+    @Test fun aManyRequestsWithoutATimeHoldsTheRestOfThisPassOnly() {
+        clocked()
+        fake.fail(Host.FINNHUB, "/api/v1/quote", Why.STATUS, 429)
+        Http.get(quote)
+        now += 9_000
+        assertFalse((Http.get(other) as Reply.Failed).sent)
+        now += 1_000
+        Http.get(other)
+        assertEquals(2, fake.asked.size)
+    }
+
+    @Test fun aRetryAfterOnAnotherStatusCountsToo() {
+        clocked()
+        fake.fail(Host.FINNHUB, "/api/v1/quote", Why.STATUS, 503, retryAfterSec = 10)
+        Http.get(quote)
+        assertFalse((Http.get(other) as Reply.Failed).sent)
+    }
+
+    @Test fun aRequestThatWasHeldCountsAsNothingSent() {
+        clocked()
+        fake.fail(Host.FINNHUB, "/api/v1/quote", Why.STATUS, 429, retryAfterSec = 30)
+        Http.get(quote)
+        assertFalse(Http.get(other).sent)
+    }
+
+    // ---- a sign-in Wi-Fi ---------------------------------------------------------------------------
+
+    @Test fun aSignInWifiCountsAsNoConnection() {
+        assertFalse(Http.usable(hasNetwork = true, captivePortal = true))
+        assertFalse(Http.usable(hasNetwork = false, captivePortal = false))
+        // Unvalidated is fine: some working networks fail Android's own check.
+        assertTrue(Http.usable(hasNetwork = true, captivePortal = false))
+    }
 }

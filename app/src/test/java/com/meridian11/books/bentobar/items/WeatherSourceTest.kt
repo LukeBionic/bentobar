@@ -60,6 +60,8 @@ class WeatherSourceTest {
     private fun runHeld() { held = false; while (waiting.isNotEmpty()) waiting.removeFirst().run() }
 
     private fun source(staged: () -> Failure? = { null }): WeatherSource {
+        // The service's wait counts by the same clock as the loader here, or an hour on the test's clock wouldn't pass for it.
+        Http.clock = { elapsed }
         val wiring = Refresher.Wiring(Executor { r -> if (held) waiting.addLast(r) else r.run() }, { it.run() }, { elapsed }, { changes++ }, minGapMs = 10_000, afterThrowMs = 60_000,
             mayLoad = { shown })
         return WeatherSource.make(

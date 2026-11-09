@@ -137,4 +137,21 @@ class HttpTransportTest {
         assertFalse(opens("https://evil.example/?x=airlabs.co"))
         assertFalse(opens("https://airlabs.co@evil.example/api"))
     }
+
+    @Test fun anAnswerThatComesAfterTheWholeRequestsTimeIsATimeoutEvenAnEmptyOne() {
+        TinyServer { TinyServer.Answer(body = ByteArray(0), delayMs = 300) }.use { server ->
+            val reply = server.transport(readMs = 2_000, totalMs = 150).get(forecast)
+            assertTrue(reply.toString(), reply is Reply.Failed && reply.why == Why.TIMEOUT)
+        }
+    }
+
+    @Test fun aSmallerWholeThanTheReadLimitBoundsTheReadToo() {
+        // The read limit can't outlast the whole request's: a stalled header wait is cut at the smaller of the two.
+        TinyServer { TinyServer.Answer(body = ByteArray(0), delayMs = 3_000) }.use { server ->
+            val began = System.nanoTime()
+            val reply = server.transport(readMs = 5_000, totalMs = 300).get(forecast)
+            assertTrue(reply.toString(), reply is Reply.Failed && reply.why == Why.TIMEOUT)
+            assertTrue("waited ${(System.nanoTime() - began) / 1_000_000} ms", System.nanoTime() - began < 2_500_000_000L)
+        }
+    }
 }

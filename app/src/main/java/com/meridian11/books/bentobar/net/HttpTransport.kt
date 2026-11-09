@@ -35,8 +35,8 @@ class HttpTransport(
         var connection: HttpURLConnection? = null
         return try {
             val c = open(address).also { connection = it }
-            c.connectTimeout = connectMs
-            c.readTimeout = readMs
+            c.connectTimeout = minOf(connectMs, totalMs)
+            c.readTimeout = minOf(readMs, totalMs)
             c.instanceFollowRedirects = false
             c.useCaches = false
             c.requestMethod = "GET"
@@ -47,6 +47,8 @@ class HttpTransport(
             c.setRequestProperty("Accept-Encoding", "gzip")
             val status = c.responseCode
             if (status !in 200..299) return Reply.Failed(Why.STATUS, status, retryAfter(c))
+            // Connecting and the headers can use up the whole allowance: an answer that took that long is given up too, even an empty one.
+            if (System.nanoTime() - deadline > 0) throw SocketTimeoutException()
             val packed = c.contentEncoding.orEmpty().trim().equals("gzip", ignoreCase = true)
             val bytes = c.inputStream.let { if (packed) GZIPInputStream(it) else it }.use { read(it, deadline) }
                 ?: return Reply.Failed(Why.TOO_LARGE, status)
@@ -60,13 +62,14 @@ class HttpTransport(
 
     /**
      * At most [maxBytes], or null if there is more: a reply that large is nobody's forecast. Each
-     * read has its own time limit, and so has the whole: past [deadline] (System.nanoTime) an answer
-     * that still trickles in is given up as a timeout.
+     * read has its own time limit ([readMs]), and so has the whole: past [deadline] (System.nanoTime)
+     * an answer that still trickles in is given up as a timeout, looked at before each read and after it.
      */
     private fun read(stream: InputStream, deadline: Long): ByteArray? {
         val out = java.io.ByteArrayOutputStream()
         val buffer = ByteArray(8 * 1024)
         while (true) {
+            if (System.nanoTime() - deadline > 0) throw SocketTimeoutException()
             val n = stream.read(buffer)
             if (n < 0) return out.toByteArray()
             if (out.size() + n > maxBytes) return null

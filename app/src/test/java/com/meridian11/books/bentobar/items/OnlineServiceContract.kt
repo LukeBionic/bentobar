@@ -111,6 +111,7 @@ abstract class OnlineServiceContract<V : Any> {
         net.fail(host, path, Why.STATUS, 429)
         net.fail(host, path, Why.STATUS, 429, retryAfterSec = long)
         assertEquals(slowMs, every(load(null)!!))
+        Http.resetCounts() // the service's wait from the first 429 ends: the second one is asked for real
         assertEquals(long * 1000, every(load(null)!!))
     }
 

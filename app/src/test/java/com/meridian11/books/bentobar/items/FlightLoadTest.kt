@@ -529,6 +529,7 @@ class FlightLoadTest {
             assertEquals(Failure.NO_ANSWER, second.failure); assertEquals(2, second.failures)
             assertEquals(900L, second.waitSec)
             assertEquals(15 * min, FlightRules.every(second, at("2026-10-02T08:01:00Z")))
+            Http.resetCounts() // the service's wait has passed by the time of the next answer
             // The next answer puts all of it right.
             net.says(AirLabs.FLIGHT to reply("flight-LH455-in-the-air"))
             val third = FlightLoad.load(item, second, asked + 47 * min, ids)!!
@@ -741,6 +742,7 @@ class FlightLoadTest {
             for (why in listOf(Why.OFFLINE, Why.STATUS, Why.TIMEOUT)) {
                 net.answer = { r -> if (r.path == AirLabs.FLIGHT) Reply.Ok(reply(morning)) else Reply.Failed(why, if (why == Why.STATUS) 429 else 0) }
                 assertEquals("$why", "MCO", found(FlightLoad.track(tomorrow(), evening)).from)
+                Http.resetCounts() // the service's wait after that 429 (a later test's question)
             }
             // The bar hid while the first request was on its way: the second is not sent, and there is nothing to say of the first.
             val before = net.asked.size

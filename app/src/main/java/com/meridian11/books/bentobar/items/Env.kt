@@ -27,6 +27,7 @@ import com.meridian11.books.bentobar.data.Online
 import com.meridian11.books.bentobar.data.Section
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.net.Http
+import com.meridian11.books.bentobar.util.Now
 
 /**
  * Process-wide context for items: the app context, the accessibility service while it runs,
@@ -77,7 +78,14 @@ object Env {
             Online.on(service) && Ticker.running &&
                 Store.config.value.items.any { it.section != Section.OFF && Items.of(it.type)?.online == service }
         }
-        Http.connected = { runCatching { app.getSystemService(ConnectivityManager::class.java)?.activeNetwork != null }.getOrDefault(true) }
+        Http.clock = Now::elapsed
+        Http.connected = {
+            runCatching {
+                val cm = app.getSystemService(ConnectivityManager::class.java)
+                val network = cm?.activeNetwork
+                Http.usable(network != null, network?.let { cm.getNetworkCapabilities(it)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) } == true)
+            }.getOrDefault(true)
+        }
         Http.onMain = { android.os.Looper.myLooper() == android.os.Looper.getMainLooper() }
         // The host, the path and what came of it, in debug builds only; never a query (a key, a city) and never a reply.
         if (BuildConfig.DEBUG) Http.log = { Log.i(TAG, it) }
