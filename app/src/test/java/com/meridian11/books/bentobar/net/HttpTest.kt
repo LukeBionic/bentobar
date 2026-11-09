@@ -252,7 +252,9 @@ class HttpTest {
         clocked()
         fake.fail(Host.FINNHUB, "/api/v1/quote", Why.STATUS, 503, retryAfterSec = 10)
         Http.get(quote)
-        assertFalse((Http.get(other) as Reply.Failed).sent)
+        val held = Http.get(other) as Reply.Failed
+        assertFalse(held.sent)
+        assertEquals("a held request says what started the hold", 503, held.status)
     }
 
     @Test fun aRequestThatWasHeldCountsAsNothingSent() {

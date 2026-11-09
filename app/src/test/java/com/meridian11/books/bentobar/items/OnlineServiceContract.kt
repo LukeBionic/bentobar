@@ -97,6 +97,28 @@ abstract class OnlineServiceContract<V : Any> {
         assertEquals(90L, waitSec(v))
     }
 
+    @Test fun aRequestHeldByAnotherStatusesWaitIsNotToldToSlowDown() = FakeHttp.use { net ->
+        net.fail(host, path, Why.STATUS, 503, retryAfterSec = 60)
+        val first = load(null)!!
+        assertEquals("NO_ANSWER", failure(first))
+        // The service is held for the minute it named; a second ask inside it never leaves, and says what started the hold.
+        val held = load(first)!!
+        assertEquals("NO_ANSWER", failure(held))
+        assertEquals(retryMs, every(held))
+        assertEquals(misses(first), misses(held))
+        assertEquals(1, net.asked.size)
+    }
+
+    @Test fun aRequestHeldByATooManyRequestsIsToldToSlowDown() = FakeHttp.use { net ->
+        net.fail(host, path, Why.STATUS, 429, retryAfterSec = 60)
+        val first = load(null)!!
+        val held = load(first)!!
+        assertEquals("SLOW_DOWN", failure(held))
+        assertEquals(slowMs, every(held))
+        assertEquals(misses(first), misses(held))
+        assertEquals(1, net.asked.size)
+    }
+
     @Test fun aGoodStatusThatHoldsNoReadingIsNoAnswerAndCountsAMiss() = FakeHttp.use { net ->
         net.reply(host, path, "<html>sign in here</html>")
         val v = load(null)!!

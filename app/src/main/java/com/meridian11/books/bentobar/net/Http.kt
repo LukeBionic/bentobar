@@ -112,14 +112,17 @@ object Http {
     @Volatile var clock: () -> Long = { System.nanoTime() / 1_000_000 }
 
     /**
-     * A 429 that names no time: long enough that the rest of one pass (ten stocks, in seconds) isn't sent, short enough
-     * not to change what an item does by itself: each service's own pace, and a press of Try again (ten seconds at the soonest).
+     * A 429 that names no time: long enough that the rest of one pass (ten stocks, in seconds) isn't sent. It does change
+     * what a request held by it comes to (a held reply reads as a 429, so an item is told to slow down and waits its
+     * service's slow-down pace), which is why it is short; a press of Try again is the soonest asked again (ten seconds).
      */
     private const val SLOW_DOWN_SEC = 10L
 
     private val counts = AtomicIntegerArray(Host.entries.size)
     /** Per service, the moment by [clock] before which nothing is sent to it: set from a 429 or a Retry-After. 0: none. */
     private val notBefore = AtomicLongArray(Online.Service.entries.size)
+    /** Per service, the status of the reply that set [notBefore], so that a held request answers with it and not with a 429 it was never given. */
+    private val holdStatus = AtomicIntegerArray(Online.Service.entries.size)
 
     /**
      * Asks, and waits for the answer: call it from a background load ([com.meridian11.books.bentobar.items.Refresher],
@@ -136,9 +139,10 @@ object Http {
         val service = Online.serviceOf(request.host).ordinal
         val wait = notBefore.get(service) - clock()
         if (wait > 0) {
-            // One 429 speaks for the whole service: Finnhub says it about one symbol, and the other nine are not sent in the same pass.
+            // One reply speaks for the whole service: Finnhub says 429 about one symbol, and the other nine are not sent in the same pass.
+            // A held request answers with the status that started the hold: a 503's hold is no answer, not a call to slow down.
             log("GET $request held: the service asked to wait")
-            return Reply.Failed(Why.STATUS, 429, retryAfterSec = (wait + 999) / 1000, sent = false)
+            return Reply.Failed(Why.STATUS, holdStatus.get(service), retryAfterSec = (wait + 999) / 1000, sent = false)
         }
         counts.incrementAndGet(request.host.ordinal)
         val reply = try {
@@ -155,7 +159,12 @@ object Http {
     /** What a service asked for, kept for every request to it: at [Reply.Failed.retryAfterSec], or for a 429 that names none, [SLOW_DOWN_SEC]. */
     private fun noteWait(service: Int, reply: Reply.Failed) {
         val seconds = reply.retryAfterSec ?: if (reply.status == 429) SLOW_DOWN_SEC else return
-        if (seconds > 0) notBefore.accumulateAndGet(service, clock() + seconds * 1000, ::maxOf)
+        if (seconds <= 0) return
+        synchronized(notBefore) {
+            val until = clock() + seconds * 1000
+            // The longer wait wins, and so does its status.
+            if (until > notBefore.get(service)) { notBefore.set(service, until); holdStatus.set(service, reply.status) }
+        }
     }
 
     /** A network that can carry a request: there is one and it isn't a sign-in page's. Validated isn't asked for: Android's own check fails on some working networks. */
@@ -172,6 +181,6 @@ object Http {
     fun resetCounts() {
         for (i in 0 until counts.length()) counts.set(i, 0)
         // And the waits: `net reset` starts over, and no test inherits another's 429.
-        for (i in 0 until notBefore.length()) notBefore.set(i, 0)
+        for (i in 0 until notBefore.length()) { notBefore.set(i, 0); holdStatus.set(i, 0) }
     }
 }
