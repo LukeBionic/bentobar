@@ -145,7 +145,7 @@ class ColorWatchTest {
         strip.watch.cause(Cause.SLOW, now = 0, first = 250)
         strip.follow(until = 400) { "white" }
         assertEquals(listOf(250L), strip.at)
-        strip.watch.windows(now = 400)
+        strip.watch.windowsMoved(now = 400)
         strip.follow { t -> if (t < 4_000) "white" else "dark" }
         // 700 serves the return's 1 000 too, and 1 700 its 2 000.
         assertEquals(listOf(250L, 700L, 1_700L, 3_500L, 6_000L, 10_000L), strip.at)
@@ -195,7 +195,7 @@ class ColorWatchTest {
         watch.cause(Cause.SLOW, now = 0, first = 250)
         watch.shot(250, Result.SAME)
         watch.taken(1_000)
-        watch.windows(now = 1_020)
+        watch.windowsMoved(now = 1_020)
         assertEquals(380L, watch.due(1_020))
         assertFalse(watch.read(1_050, Result.SAME))
         assertEquals(350L, watch.due(1_050))
@@ -287,7 +287,7 @@ class ColorWatchTest {
         val at = ArrayList<Long>()
         for (t in 0L..24_000L step 100) {
             if (watch.due(t) == 0L) { at += t; watch.shot(t, Result.SAME) }
-            if (t <= 20_000 && t % 400 == 0L) watch.windows(t)
+            if (t <= 20_000 && t % 400 == 0L) watch.windowsMoved(t)
         }
         val during = at.filter { it <= 20_000 }
         assertTrue("$during", during.size in 9..11)
@@ -306,7 +306,7 @@ class ColorWatchTest {
         val at = ArrayList<Long>()
         for (t in 0L..200_000L step 100) {
             if (watch.due(t) == 0L) { at += t; watch.shot(t, Result.SAME) }
-            if (t <= 180_000 && t % 2_000 == 0L) watch.windows(t)
+            if (t <= 180_000 && t % 2_000 == 0L) watch.windowsMoved(t)
         }
         assertTrue("${at.take(40)}", mostInAMinute(at) <= 36)
         assertTrue(mostInAMinute(at.filter { it > 60_000 }) <= 31)
@@ -350,7 +350,7 @@ class ColorWatchTest {
                 while (answers.isNotEmpty() && answers.first() <= t) { answers.removeAt(0); watch.read(t, Result.values()[random.nextInt(3)]) }
                 if (watch.due(t) == 0L) { watch.taken(t); asked += t; answers += t + random.nextInt(16) * 10; answers.sort() }
                 when (random.nextInt(60)) { // something about every 200 ms
-                    0 -> watch.windows(t)
+                    0 -> watch.windowsMoved(t)
                     1 -> watch.cause(Cause.QUICK, t, 100L + random.nextInt(5) * 100)
                     2 -> if (random.nextInt(10) == 0) watch.cause(Cause.SLOW, t, 250)
                     3 -> if (random.nextInt(20) == 0) watch.clear()

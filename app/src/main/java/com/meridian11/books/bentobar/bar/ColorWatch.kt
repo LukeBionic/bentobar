@@ -69,7 +69,7 @@ class ColorWatch {
      * opens is another window under the bar. Only these first readings count for that: a window
      * maximized right after an unlock is not held back by the readings the unlock asked for.
      */
-    fun windows(now: Long) {
+    fun windowsMoved(now: Long) {
         cause(Cause.QUICK, now, BarNeighbours.wait(now - windowsRead))
         windowsDue = quick.first()
     }

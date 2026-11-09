@@ -17,7 +17,9 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
 - `app/src/main/java/com/meridian11/books/bentobar/`
   - `bar/BarService.kt`: the AccessibilityService plus `BarController`. It scans the status bar,
     places the strip, hides it (fullscreen, keyguard, screen off, a shade covering the bar), runs
-    menus, keep awake (a flag on the strip window) and colour sampling, and has adb `debug()` hooks.
+    menus and keep awake (a flag on the strip window), and has adb `debug()` hooks.
+  - `bar/ColorReader.kt`: the strip's colours: when the bar is read (`ColorWatch` says), what a reading makes of the
+    look (`StripLook`), the hints when there is no reading. The screenshot itself is `StatusBarScan.shoot`.
   - `bar/StatusBarScan.kt`: the edge of the window reading: the window list as `WindowFact`s (kind, id, bounds) and
     the status bar window's node tree as `BarNode`s, for `BarRules`.
   - `bar/BarRules.kt`: what those facts mean, pure and unit-tested: which window is the status bar (TYPE_SYSTEM at

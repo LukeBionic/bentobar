@@ -1,8 +1,11 @@
 package com.meridian11.books.bentobar.bar
 
+import android.accessibilityservice.AccessibilityService
+import android.graphics.Bitmap
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import java.util.concurrent.Executor
 
 /** Android's rectangle as a plain [Box], and back. */
 internal fun Rect.box() = Box(left, top, right, bottom)
@@ -46,5 +49,34 @@ object StatusBarScan {
             for (i in n.childCount - 1 downTo 0) n.getChild(i)?.let { stack.add(it to depth + 1) }
         }
         return Scanned(BarRules.parse(w.id, bar, nodes), spacerNode)
+    }
+
+    /**
+     * A reading: a screenshot of the status bar window only, its pixels read for [ColorReader]. Android answers on
+     * [callbacks]. [done] gets the colours (null: the picture gave none), or the code of Android's refusal as its second
+     * argument.
+     */
+    fun shoot(service: AccessibilityService, s: BarSnapshot, callbacks: Executor, done: (BarColors?, Int?) -> Unit) {
+        service.takeScreenshotOfWindow(s.windowId, callbacks, object : AccessibilityService.TakeScreenshotCallback {
+            override fun onSuccess(r: AccessibilityService.ScreenshotResult) { done(runCatching { barColors(r, s) }.getOrNull(), null) }
+            override fun onFailure(code: Int) { done(null, code) }
+        })
+    }
+
+    /** The pixels around the clock (the whole bar when no clock was found), as [BarPixels] reads them. */
+    private fun barColors(r: AccessibilityService.ScreenshotResult, s: BarSnapshot): BarColors? {
+        val hb = r.hardwareBuffer
+        val bmp = try {
+            Bitmap.wrapHardwareBuffer(hb, r.colorSpace)?.let { wrapped -> wrapped.copy(Bitmap.Config.ARGB_8888, false).also { wrapped.recycle() } }
+        } finally { hb.close() }
+        bmp ?: return null
+        try {
+            val area = (s.clock ?: s.bar).rect().apply { offset(-s.bar.left, -s.bar.top) }
+            // A clock box outside the picture (the bar changed size since the scan): read all of it.
+            if (!area.intersect(0, 0, bmp.width, bmp.height)) area.set(0, 0, bmp.width, bmp.height)
+            val px = IntArray(area.width() * area.height())
+            bmp.getPixels(px, 0, area.width(), area.left, area.top, area.width(), area.height())
+            return BarPixels.colors(px, area.width())
+        } finally { bmp.recycle() }
     }
 }

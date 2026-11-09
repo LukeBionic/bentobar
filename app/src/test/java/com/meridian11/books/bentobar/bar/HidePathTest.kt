@@ -12,6 +12,7 @@ import java.io.File
  */
 class HidePathTest {
     private val code = File("src/main/java/com/meridian11/books/bentobar/bar/BarService.kt").readText()
+    private val colors = File("src/main/java/com/meridian11/books/bentobar/bar/ColorReader.kt").readText()
 
     /** The branch of check() that runs when the strip is not to be shown. */
     private val hide = code.substringAfter("\"bar hidden (statusBar=").substringBefore("/** adb `debug trace on|off`")
@@ -19,11 +20,14 @@ class HidePathTest {
     @Test fun theBarHidesInItsOneOrderAndLetsGoOfThePointerBeforeTheWindowGoes() {
         var at = 0
         for (step in listOf("closeMenu(now = true)", "hideTip()", "cancelDrag()", "hovering = false", "main.removeCallbacks(expandOnHover)",
-            "strip.hide()", "watch.clear()", "updateAwake()", "Ticker.stop(\"bar\")")) {
+            "strip.hide()", "colors.stripLeft()", "updateAwake()", "Ticker.stop(\"bar\")")) {
             val i = hide.indexOf(step, at)
             assertTrue("$step is missing, or out of order, in the hide path", i >= 0)
             at = i + step.length
         }
+        // The readings still to come go with the strip: what stripLeft() does, in the colour reader.
+        val left = colors.substringAfter("fun stripLeft()").substringBefore("\n")
+        assertTrue(left, "watch.clear()" in left && "main.removeCallbacks(sample)" in left)
     }
 
     @Test fun whatTheHoverHeldOutFoldsAwayButWhatWasPinnedStays() {
