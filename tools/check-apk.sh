@@ -5,6 +5,7 @@
 # release.yml runs it before anything is published; run it by hand on any APK:  tools/check-apk.sh path/to/app.apk
 set -euo pipefail
 APK=${1:?usage: tools/check-apk.sh <apk>}
+APK=$(cd "$(dirname "$APK")" && pwd)/$(basename "$APK")  # a relative path means the caller's folder, not the repo root
 cd "$(dirname "$0")/.."
 AAPT2=${AAPT2:-"${ANDROID_HOME:?set ANDROID_HOME or AAPT2}/build-tools/36.0.0/aapt2"}
 TREE=$(mktemp); trap 'rm -f "$TREE"' EXIT
