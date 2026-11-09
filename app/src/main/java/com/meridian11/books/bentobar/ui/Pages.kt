@@ -63,6 +63,8 @@ import com.meridian11.books.bentobar.data.HiddenMode
 import com.meridian11.books.bentobar.data.Online
 import com.meridian11.books.bentobar.data.Uses
 import com.meridian11.books.bentobar.data.TextSize
+import com.meridian11.books.bentobar.data.SPACING_DP
+import com.meridian11.books.bentobar.data.spacingDp
 import com.meridian11.books.bentobar.items.Env
 import com.meridian11.books.bentobar.items.Items
 import com.meridian11.books.bentobar.items.MediaAccess
@@ -166,7 +168,7 @@ fun LookPage() {
         ChoiceRow(stringResource(R.string.look_position), listOf(Position.RIGHT to stringResource(R.string.look_position_right),
             Position.CENTER to stringResource(R.string.look_position_center), Position.LEFT to stringResource(R.string.look_position_left)),
             cfg.position) { p -> Store.update { it.copy(position = p) } }
-        SliderRow(stringResource(R.string.look_spacing), cfg.spacing, 0..24, { "$it dp" }) { v -> Store.update { it.copy(spacing = v) } }
+        SliderRow(stringResource(R.string.look_spacing), cfg.spacingDp, SPACING_DP, { "$it dp" }) { v -> Store.update { it.copy(spacing = v) } }
         SwitchRow(stringResource(R.string.look_presenting), cfg.presenting, help = stringResource(R.string.look_presenting_help)) { on ->
             Store.update { it.copy(presenting = on) }
         }

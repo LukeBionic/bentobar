@@ -45,6 +45,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.meridian11.books.bentobar.R
 import com.meridian11.books.bentobar.data.ItemConfig
+import com.meridian11.books.bentobar.data.SPACER_DP
+import com.meridian11.books.bentobar.data.spacerWidthDp
 import com.meridian11.books.bentobar.ui.ActionTile
 import com.meridian11.books.bentobar.ui.ChoiceRow
 import com.meridian11.books.bentobar.ui.ChipRow
@@ -420,12 +422,12 @@ object TextItem : ItemType("text", R.string.item_text_title, Sym.TEXT_FIELDS, R.
 object SpacerItem : ItemType("spacer", R.string.item_spacer_title, Sym.SPACE_BAR, R.string.item_spacer_desc) {
     override val refreshMs = 60_000L
 
-    override fun state(item: ItemConfig) = ItemState(gapDp = item.optInt("width", 12), divider = item.optBool("line", false), desc = Env.str(R.string.spacer_desc))
+    override fun state(item: ItemConfig) = ItemState(gapDp = item.spacerWidthDp, divider = item.optBool("line", false), desc = Env.str(R.string.spacer_desc))
 
     override fun onClick(item: ItemConfig) = true
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        SliderRow(stringResource(R.string.spacer_width), item.optInt("width", 12), 4..64, { "$it dp" }) { set(item.with("width", it.toString())) }
+        SliderRow(stringResource(R.string.spacer_width), item.spacerWidthDp, SPACER_DP, { "$it dp" }) { set(item.with("width", it.toString())) }
         SwitchRow(stringResource(R.string.spacer_line), item.optBool("line", false)) { set(item.with("line", it.toString())) }
     }
 }

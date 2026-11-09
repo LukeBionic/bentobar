@@ -101,6 +101,7 @@ import com.meridian11.books.bentobar.data.shows
 import com.meridian11.books.bentobar.data.behindChevron
 import com.meridian11.books.bentobar.data.HiddenMode
 import com.meridian11.books.bentobar.data.Store
+import com.meridian11.books.bentobar.data.spacingDp
 import com.meridian11.books.bentobar.items.ItemState
 import com.meridian11.books.bentobar.items.Items
 import com.meridian11.books.bentobar.items.Ticker
@@ -205,7 +206,7 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
         ColorMode.DARK -> Contrast.resolve(Contrast.DARK_TEXT, null)
         ColorMode.AUTO -> live ?: Contrast.resolve(Color.White, null)
     }
-    val look = StripLook(bar.fg, bar.barDark, cfg.textSize, cfg.spacing.dp, cfg.pill, bar.background)
+    val look = StripLook(bar.fg, bar.barDark, cfg.textSize, cfg.spacingDp.dp, cfg.pill, bar.background)
     val barBrush = when {
         bar.opaque -> androidx.compose.ui.graphics.SolidColor(bar.background)
         bar.barDark -> Brush.horizontalGradient(listOf(Color(0xFF5B6F8A), Color(0xFF3F6F73), Color(0xFF4F7E78)))

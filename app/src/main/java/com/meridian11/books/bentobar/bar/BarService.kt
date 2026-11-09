@@ -42,6 +42,7 @@ import com.meridian11.books.bentobar.data.Position
 import com.meridian11.books.bentobar.data.Section
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.data.TextSize
+import com.meridian11.books.bentobar.data.spacingDp
 import com.meridian11.books.bentobar.items.Caffeine
 import com.meridian11.books.bentobar.items.Chips
 import com.meridian11.books.bentobar.items.DisplaysItem
@@ -546,7 +547,7 @@ class BarController(private val service: AccessibilityService) {
         }
         val live = Contrast.resolve(text, bg)
         BarLook.current.value = live
-        look.value = StripLook(live.fg, live.barDark, cfg.textSize, cfg.spacing.dp, cfg.pill, live.background)
+        look.value = StripLook(live.fg, live.barDark, cfg.textSize, cfg.spacingDp.dp, cfg.pill, live.background)
         Log.i(tag, "look fg=${hex(live.fg)} bg=${bg?.let { hex(it) } ?: "transparent"} dark=${live.barDark} " +
             "contrast=${"%.1f".format(java.util.Locale.ROOT, Contrast.ratio(live.fg, live.background))}")
     }

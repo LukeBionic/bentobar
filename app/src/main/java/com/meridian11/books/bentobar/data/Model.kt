@@ -120,6 +120,19 @@ data class BarConfig(
     val cities: List<WorldCity> = emptyList(),
 )
 
+/** The settings' limits for the two numbers from a layout that the strip measures. */
+val SPACING_DP = 0..24
+val SPACER_DP = 4..64
+
+/**
+ * Space between items, within the slider's limits. A layout can be pasted in and can say anything, and Compose throws
+ * during measure for a width over 262,142 px: with the layout already saved, that is the service crashing at every start.
+ */
+val BarConfig.spacingDp: Int get() = spacing.coerceIn(SPACING_DP)
+
+/** A spacer's width, within the slider's limits, for the same reason as [spacingDp]. */
+val ItemConfig.spacerWidthDp: Int get() = optInt("width", 12).coerceIn(SPACER_DP)
+
 /** This config with the settings that belong to one install taken from [local] (see [Store.import]). */
 fun BarConfig.keepingLocal(local: BarConfig): BarConfig = copy(enabled = local.enabled, turnedOff = local.turnedOff,
     presenting = local.presenting, pinnedOpen = local.pinnedOpen, onboarded = local.onboarded)
