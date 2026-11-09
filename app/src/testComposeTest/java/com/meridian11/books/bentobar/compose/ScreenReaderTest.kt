@@ -31,6 +31,7 @@ import com.meridian11.books.bentobar.ui.ChipRow
 import com.meridian11.books.bentobar.ui.MenuEntry
 import com.meridian11.books.bentobar.ui.SectionLabel
 import com.meridian11.books.bentobar.ui.SliderRow
+import com.meridian11.books.bentobar.util.Fmt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -73,7 +74,15 @@ class ScreenReaderTest {
         rule.onNodeWithContentDescription("Spacing").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "12 dp"))
     }
 
-    private object Events : StripEvents {
+    @Test fun theFormatsTakeTheirWordsFromTheAppsText() {
+        // Env.init hands Fmt the words from the text resources: a resource format that doesn't fit its call shows up here.
+        assertEquals("85%", Fmt.percent(85))
+        assertEquals("840 KB", Fmt.bytes(840_000.0))
+        assertEquals("1 hour 5 minutes", Fmt.spoken(65 * 60_000L))
+        assertEquals("1h 05m", Fmt.duration(65 * 60_000L))
+    }
+
+        private object Events : StripEvents {
         override fun click(item: ItemConfig, at: Rect) {}
         override fun context(item: ItemConfig, at: Rect) {}
         override fun scroll(item: ItemConfig, steps: Int) {}

@@ -506,7 +506,7 @@ object SpacerItem : ItemType(SpacerItem.TYPE, R.string.item_spacer_title, Sym.SP
     override fun onClick(item: ItemConfig) = true
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        val res = androidx.compose.ui.platform.LocalContext.current.resources
+        val res = androidx.compose.ui.platform.LocalResources.current
         SliderRow(stringResource(R.string.spacer_width), item.spacerWidthDp, SPACER_DP, { res.getString(R.string.common_dp, it) }) { set(item.with("width", it.toString())) }
         SwitchRow(stringResource(R.string.spacer_line), item.optBool("line", false)) { set(item.with("line", it.toString())) }
     }
