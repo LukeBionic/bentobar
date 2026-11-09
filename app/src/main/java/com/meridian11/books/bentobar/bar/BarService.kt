@@ -199,10 +199,10 @@ class BarController(private val service: AccessibilityService) {
     private fun lightCheck() {
         val s = snap ?: return scan()
         val node = spacerNode
-        // A bar without the DesktopStatusBarSpacer node has nothing cheap to re-check: a full scan
-        // (with clearCache) every 2 s is costly, so between full scans only the window list is read.
-        if (node == null) return if (SystemClock.uptimeMillis() - lastFullScan > 10_000) scan() else check(full = false)
-        if (SystemClock.uptimeMillis() - lastFullScan > 30_000 || !node.refresh()) return scan()
+        val step = BarRules.lightLook(hasSpacer = node != null, sinceFullMs = SystemClock.uptimeMillis() - lastFullScan)
+        if (step == BarRules.LightLook.FULL) return scan()
+        if (node == null || step == BarRules.LightLook.WINDOWS) return check(full = false)
+        if (!node.refresh()) return scan()
         // Against the spacer's own last bounds: with the spacer squeezed to nothing, the free area is
         // the widest gap instead, and comparing with that would run a full scan every time.
         val r = Rect().also { node.getBoundsInScreen(it) }
@@ -327,6 +327,14 @@ class BarController(private val service: AccessibilityService) {
     private fun scan() = check(full = true)
 
     /**
+     * The one window title BentoBar reads (AGENTS.md, Least privilege), and only so that the screenshot preview doesn't
+     * count as a shade. [BarRules.decide] asks it of a big system window over the bar's free area and nothing else;
+     * the title is compared here, never logged or kept.
+     */
+    private fun isScreenshotPreview(w: AccessibilityWindowInfo) =
+        w.type == AccessibilityWindowInfo.TYPE_SYSTEM && w.title?.contains("Screenshot", ignoreCase = true) == true
+
+    /**
      * Where the status bar is and whether to show the strip. A cheap pass reads just the window list;
      * the status bar's node tree is read only when [full] or the bar window itself changed.
      */
@@ -341,63 +349,36 @@ class BarController(private val service: AccessibilityService) {
         val listed = windows.map { StatusBarScan.fact(it) }
         overlayIds = listed.filter { it.kind == WindowFact.Kind.OVERLAY }.map { it.id }.toSet()
         val barFact = BarRules.findBar(listed, screenW, maxH)
-        val barWindow = barFact?.let { windows[listed.indexOf(it)] }
-        val barBounds = barFact?.box
         val prev = snap
         val s = when {
-            barWindow == null -> null
-            !full && prev != null && prev.windowId == barWindow.id && prev.bar == barBounds -> prev
+            barFact == null -> null
+            BarRules.keepsReading(full, prev, barFact) -> prev
             else -> {
                 lastFullScan = SystemClock.uptimeMillis()
                 // Without content-change events the node cache can go stale: read the status bar fresh.
                 service.clearCache()
-                val scanned = runCatching { StatusBarScan.scan(barWindow) }.onFailure { Log.w(tag, "scan failed", it) }.getOrNull()
+                val scanned = runCatching { StatusBarScan.scan(windows[listed.indexOf(barFact)]) }.onFailure { Log.w(tag, "scan failed", it) }.getOrNull()
                 // A reading kept from before has no node (a scan without a tree brought none).
                 spacerNode = scanned?.spacerNode
-                // No node tree (SystemUI mid-change): the whole bar would cover its icons. Keep the last
-                // reading of this same bar (without its cached node); with none, stay hidden until a scan can read it.
-                scanned?.snapshot?.let { if (it.summary != BarRules.NO_TREE) it else prev?.takeIf { p -> p.windowId == it.windowId && p.bar == it.bar } }
+                BarRules.settled(scanned?.snapshot, prev)
             }
         }
         if (s == null) spacerNode = null
-        val newWindow = s?.windowId != snap?.windowId
         snap = s
         val cfg = Store.config.value
-        // On tablets the shade and Quick Settings slide over the status bar; our overlay would sit
-        // on top of them. Only a big system window counts: on the desktop bar the panels open as
-        // popups below the bar, and small system UI near the top shouldn't blink BentoBar away.
-        // The screenshot UI is a big, mostly see-through system window too ("Screenshot preview",
-        // full screen while it animates), but it doesn't cover the bar: hiding for it made the strip
-        // vanish for the seconds the preview shows.
-        val cover = if (s == null) null else windows.firstOrNull { w ->
-            val r = Rect().also { w.getBoundsInScreen(it) }
-            w.type == AccessibilityWindowInfo.TYPE_SYSTEM && w.id != s.windowId && Rect.intersects(r, s.free.rect()) &&
-                r.height() >= s.bar.height() * 4 && w.title?.contains("Screenshot", ignoreCase = true) != true
-        }
-        val covered = cover != null
-        val show = s != null && !covered && cfg.enabled && pm.isInteractive && !km.isKeyguardLocked
-        if (!show) BarStatus.current.value = when {
-            !pm.isInteractive || km.isKeyguardLocked -> BarStatus.ASLEEP
-            !cfg.enabled -> BarStatus.HIDDEN_BY_USER
-            s == null -> BarStatus.NO_BAR
-            else -> BarStatus.COVERED
-        }
-        // An app window settled against the bar's lower edge (maximized, or snapped to a side), or a
-        // full-screen one lies under the bar: SystemUI then gives the bar a background of its own, or that
-        // app's light or dark icons, and takes them away when the window leaves, without an event of the
-        // bar's own. Only the windows' ids and bounds are looked at, from the list at hand.
-        val moved = s != null && neighbours.next(s.bar.bottom, s.bar.width(),
-            windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-                .map { w -> Rect().also { w.getBoundsInScreen(it) }.let { AppWindow(w.id, it.left, it.top, it.right, it.bottom) } })
-            .let { (seen, moved) -> neighbours = seen; moved }
-        if (show) {
+        val interactive = pm.isInteractive
+        val locked = km.isKeyguardLocked
+        val d = BarRules.decide(BarFacts(listed, s, prev, cfg.enabled, interactive, locked, neighbours)) { isScreenshotPreview(windows[listed.indexOf(it)]) }
+        d.status?.let { BarStatus.current.value = it }
+        neighbours = d.neighbours
+        if (d.show) {
             place(s!!, screenW)
             // A new status bar window can look different (see readSoon for the other causes).
-            if (newWindow) readSoon(ColorWatch.Cause.QUICK, 250)
-            else if (moved) { watch.windows(SystemClock.uptimeMillis()); arm() }
+            if (d.read == BarRules.Read.NEW_BAR_WINDOW) readSoon(ColorWatch.Cause.QUICK, 250)
+            else if (d.read == BarRules.Read.WINDOWS_MOVED) { watch.windows(SystemClock.uptimeMillis()); arm() }
         } else {
-            if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${cover?.let { Rect().also { r -> it.getBoundsInScreen(r) }.toShortString() }} " +
-                "enabled=${cfg.enabled} interactive=${pm.isInteractive} locked=${km.isKeyguardLocked})")
+            if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${d.cover?.box?.toShortString()} " +
+                "enabled=${cfg.enabled} interactive=$interactive locked=$locked)")
             closeMenu(now = true)
             hideTip()
             cancelDrag() // the strip's window goes, and with it the release that would end a drag

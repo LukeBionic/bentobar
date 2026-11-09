@@ -52,11 +52,46 @@ data class BarSnapshot(
     val spacer: Box? = null,
 )
 
+/** What one look at the bar knows. The last look's reading and neighbours are facts too: nothing is remembered in here. */
+internal data class BarFacts(
+    /** The windows the list gave, in its order. It can end early: a window missing from it has not left. */
+    val listed: List<WindowFact>,
+    /** This look's reading of the bar; null with no bar to read. */
+    val reading: BarSnapshot?,
+    /** The last look's. */
+    val last: BarSnapshot?,
+    val enabled: Boolean,
+    val interactive: Boolean,
+    val locked: Boolean,
+    val neighbours: BarNeighbours,
+)
+
+/** What one look comes to. */
+internal data class BarDecision(
+    val show: Boolean,
+    /** Why the strip is not shown. Null while it is: placing it says how that went. */
+    val status: BarStatus?,
+    val cover: WindowFact?,
+    /** What to remember for the next look. */
+    val neighbours: BarNeighbours,
+    /** A reading of the bar's colors this look asks for, if any. */
+    val read: BarRules.Read?,
+)
+
 /**
  * What the window list and the status bar's tree mean, as plain rules over plain facts. No Android types: the facts are
  * collected in `StatusBarScan` and `BarController.check`, and the cases the devices showed are unit-tested here.
+ *
+ * There is no state in here and no state machine for the bar: each rule is a function of one look. The controller still
+ * does everything that touches Android, and in the order that matters.
  */
 internal object BarRules {
+    /** What asks [decide] for a reading of the bar's colors. */
+    enum class Read { NEW_BAR_WINDOW, WINDOWS_MOVED }
+
+    /** What the two-second look does. */
+    enum class LightLook { FULL, WINDOWS, SPACER }
+
     /** [BarSnapshot.summary] when the window had no node tree to read: its free area is unknown. */
     const val NO_TREE = "no-tree"
     private val timeRe = Regex("""\d{1,2}[:.]\d{2}""")
@@ -64,6 +99,30 @@ internal object BarRules {
     /** The status bar window: a system window along the top edge, shorter than [maxHeight]. */
     fun findBar(listed: List<WindowFact>, screenWidth: Int, maxHeight: Int): WindowFact? =
         listed.firstOrNull { w -> w.kind == WindowFact.Kind.SYSTEM && w.box.top == 0 && w.box.height() in 1..maxHeight && w.box.width() >= screenWidth / 2 }
+
+    /** Whether the last reading still stands: a cheap look at the same bar window in the same place reads no node. */
+    fun keepsReading(full: Boolean, last: BarSnapshot?, bar: WindowFact) = !full && last != null && last.windowId == bar.id && last.bar == bar.box
+
+    /**
+     * The reading a scan comes to: what it [read], or null if it threw. No node tree (SystemUI mid-change): the whole bar
+     * would cover its icons, so the last reading of this same bar stands; with none, stay hidden until a scan can read it.
+     */
+    fun settled(read: BarSnapshot?, last: BarSnapshot?): BarSnapshot? = when {
+        read == null -> null
+        read.summary != NO_TREE -> read
+        else -> last?.takeIf { it.windowId == read.windowId && it.bar == read.bar }
+    }
+
+    /**
+     * What the look every two seconds does, [sinceFullMs] after the last full scan. Without content events the node cache
+     * goes stale, so a full scan comes every 30 s whatever else happens. A bar without the spacer node has nothing cheap
+     * to re-check: a full scan (with clearCache) every 2 s is costly, so between full scans only the window list is read.
+     */
+    fun lightLook(hasSpacer: Boolean, sinceFullMs: Long): LightLook = when {
+        !hasSpacer -> if (sinceFullMs > 10_000) LightLook.FULL else LightLook.WINDOWS
+        sinceFullMs > 30_000 -> LightLook.FULL
+        else -> LightLook.SPACER
+    }
 
     /** Whether the node with this resource id is the desktop bar's spacer. */
     fun isSpacer(id: String) = id.endsWith("DesktopStatusBarSpacer")
@@ -90,6 +149,46 @@ internal object BarRules {
         }
         val free = spacer?.takeIf { it.width() > 0 } ?: widestGap(bar, parts)
         return BarSnapshot(windowId, bar, free, clock, names.toString().trim(), spacer)
+    }
+
+    /**
+     * Whether the strip shows, and what follows from this look at the windows. [titleSaysScreenshot] is the one question
+     * about a title, asked of a window only once everything else says it covers the bar, and of no window after the first
+     * that does.
+     */
+    fun decide(f: BarFacts, titleSaysScreenshot: (WindowFact) -> Boolean): BarDecision {
+        val s = f.reading
+        // On tablets the shade and Quick Settings slide over the status bar; our overlay would sit
+        // on top of them. Only a big system window counts: on the desktop bar the panels open as
+        // popups below the bar, and small system UI near the top shouldn't blink BentoBar away.
+        // The screenshot UI is a big, mostly see-through system window too ("Screenshot preview",
+        // full screen while it animates), but it doesn't cover the bar: hiding for it made the strip
+        // vanish for the seconds the preview shows.
+        val cover = if (s == null) null else f.listed.firstOrNull { w ->
+            w.kind == WindowFact.Kind.SYSTEM && w.id != s.windowId && w.box.intersects(s.free) &&
+                w.box.height() >= s.bar.height() * 4 && !titleSaysScreenshot(w)
+        }
+        val show = s != null && cover == null && f.enabled && f.interactive && !f.locked
+        val status = if (show) null else when {
+            !f.interactive || f.locked -> BarStatus.ASLEEP
+            !f.enabled -> BarStatus.HIDDEN_BY_USER
+            s == null -> BarStatus.NO_BAR
+            else -> BarStatus.COVERED
+        }
+        // An app window settled against the bar's lower edge (maximized, or snapped to a side), or a
+        // full-screen one lies under the bar: SystemUI then gives the bar a background of its own, or that
+        // app's light or dark icons, and takes them away when the window leaves, without an event of the
+        // bar's own. Only the windows' ids and bounds are looked at, from the list at hand.
+        val (neighbours, moved) = if (s == null) f.neighbours to false else f.neighbours.next(s.bar.bottom, s.bar.width(),
+            f.listed.filter { it.kind == WindowFact.Kind.APPLICATION }.map { w -> AppWindow(w.id, w.box.left, w.box.top, w.box.right, w.box.bottom) })
+        val read = when {
+            !show -> null
+            // A new status bar window can look different.
+            s?.windowId != f.last?.windowId -> Read.NEW_BAR_WINDOW
+            moved -> Read.WINDOWS_MOVED
+            else -> null
+        }
+        return BarDecision(show, status, cover, neighbours, read)
     }
 
     /** The widest horizontal stretch of the bar that no item covers. */
