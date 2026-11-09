@@ -116,6 +116,45 @@ class TickLoopTest {
         assertEquals(runsBefore, samplerRuns.size)
     }
 
+    @Test fun aRefreshByHandFeedsNoSamplerButStillLooksAtTheClocks() {
+        // F19: a click or a wheel notch put a reading milliseconds after the last one into the network sampler: a false spike.
+        // The clocks must still run: a click relies on refresh() to show a timer or keep awake it has just changed.
+        type("one"); layout(item("a", "one"))
+        loop.start("bar")
+        val runs = samplerRuns.size; val checks = clockChecks
+        loop.refresh()
+        assertEquals(runs, samplerRuns.size)
+        assertEquals(checks + 1, clockChecks)
+        tick()
+        assertEquals("the next scheduled tick samples as usual", runs + 1, samplerRuns.size)
+    }
+
+    @Test fun aSamplerThatHasNoReadingYetTakesItsFirstOneOnARefreshAndOnlyThat() {
+        // A hidden battery item, revealed by a click, would otherwise read 0% until the next tick.
+        type("one"); type("two")
+        layout(item("a", "one"))
+        loop.start("bar")
+        samplerRuns.clear()
+        layout(item("a", "one"), item("b", "two"))
+        loop.refresh()
+        assertEquals(listOf(setOf("two")), samplerRuns)
+        loop.refresh()
+        assertEquals("the first one only", 1, samplerRuns.size)
+    }
+
+    @Test fun aSamplerThatWasDroppedTakesAFreshReadingWhenItIsNeededAgain() {
+        // Hours behind ‹, then revealed: what it last read is old by then.
+        type("one"); type("two")
+        layout(item("a", "one"), item("b", "two"))
+        loop.start("bar")
+        layout(item("a", "one"))
+        tick()
+        samplerRuns.clear()
+        layout(item("a", "one"), item("b", "two"))
+        loop.refresh()
+        assertEquals(listOf(setOf("two")), samplerRuns)
+    }
+
     @Test fun aTypeThatFailsCostsTheOthersNothing() {
         type("bad", fails = setOf("state", "sample", "live", "idle")); type("good")
         layout(item("a", "bad"), item("b", "good"))

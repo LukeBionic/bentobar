@@ -191,8 +191,17 @@ class NetSampler {
         val rx = TrafficStats.getTotalRxBytes()
         val tx = TrafficStats.getTotalTxBytes()
         if (rx == TrafficStats.UNSUPPORTED.toLong() || tx == TrafficStats.UNSUPPORTED.toLong()) return
+        reading(rx, tx, now)
+    }
+
+    /**
+     * The device's byte counters at [now]. Too soon after the last reading ([MIN_GAP_MS]) a counter step says nothing: 5 KB in
+     * 10 ms would read as the 500 KB/s that makes the Network item pop out. It is left for the next reading to measure.
+     */
+    internal fun reading(rx: Long, tx: Long, now: Long) {
         rxTotal = rx; txTotal = tx
-        if (lastRx >= 0 && now > lastAt) {
+        if (lastRx >= 0 && now - lastAt < MIN_GAP_MS) return
+        if (lastRx >= 0) {
             val dt = (now - lastAt) / 1000.0
             // Counters can reset (interface restarts): treat drops as zero.
             down = ((rx - lastRx).coerceAtLeast(0)) / dt
@@ -203,6 +212,8 @@ class NetSampler {
         }
         lastRx = rx; lastTx = tx; lastAt = now
     }
+
+    private companion object { const val MIN_GAP_MS = 500L }
 
     /** "Wi-Fi", "Ethernet", … plus metered state, from the default network. */
     fun describe(context: Context): String = runCatching { describeOrThrow(context) }.getOrDefault(context.getString(R.string.network_menu_title))

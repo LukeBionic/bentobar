@@ -41,6 +41,8 @@ open class TickLoop(private val wiring: Wiring) {
     private val lastRun = HashMap<String, Long>()
     /** When the last scheduled tick ran: what a recompute by hand is stamped with ([TickRules.stamp]). */
     private var lastTickAt: Long? = null
+    /** The samplers the last run asked for: one that isn't among them yet has no reading to show. */
+    private val samplersInUse = HashSet<String>()
     /** When each item last had something to say, for [TickRules.held]; and the settings it had then (a change ends its hold). */
     private val lastActive = HashMap<String, Long>()
     private val heldFor = HashMap<String, ItemConfig>()
@@ -217,7 +219,12 @@ open class TickLoop(private val wiring: Wiring) {
             // A type may read another type's sampler (Heat reads the battery's temperature): those run for it too.
             val sampled = HashSet(types)
             for (t in types) wiring.type(t)?.samples?.let { sampled += it }
-            wiring.sampleEnv(now, sampled)
+            // Only the tick on the second feeds the samplers: a click, a wheel notch or a settings change a few milliseconds after
+            // the last reading is a spike in the rate and a junk point in the chart. A sampler just taken up gets its first
+            // reading all the same, or what it stands for shows nothing (a battery at 0%) until the tick.
+            val due = if (scheduled) sampled else sampled - samplersInUse
+            samplersInUse.clear(); samplersInUse += sampled
+            if (due.isNotEmpty()) wiring.sampleEnv(now, due)
             if (users.isNotEmpty()) for (t in types) hook(t, "sample") { it.sample(wiring.sampleClock()) }
         }
         // Behind a guard of their own: a sampler that fails must not cost a timer or keep awake this tick's look at the clock.
