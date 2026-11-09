@@ -45,6 +45,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.meridian11.books.bentobar.bar.SliderMath
 import com.meridian11.books.bentobar.R
 import com.meridian11.books.bentobar.util.SymIcon
 
@@ -118,10 +119,10 @@ fun SliderRow(label: String, value: Int, range: IntRange, format: (Int) -> Strin
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Row {
             Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-            Text(format(v.toInt()), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text(format(SliderMath.stop(v)), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         }
-        Slider(value = v, onValueChange = { v = it }, onValueChangeFinished = { onChange(v.toInt()) },
-            valueRange = range.first.toFloat()..range.last.toFloat(), steps = (range.last - range.first - 1).coerceIn(0, 40),
+        Slider(value = v, onValueChange = { v = it }, onValueChangeFinished = { onChange(SliderMath.stop(v)) },
+            valueRange = range.first.toFloat()..range.last.toFloat(), steps = SliderMath.stops(range),
             modifier = Modifier.semantics { contentDescription = label })
     }
 }

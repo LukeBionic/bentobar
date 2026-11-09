@@ -25,6 +25,15 @@ object SliderMath {
         return if (steps <= 0) l else Math.round(l * steps).toFloat() / steps
     }
 
+    /**
+     * The whole number a settings slider stands on: the nearest, since a stop can come in a hair under its number
+     * (6.9999995 for 7), where turning it into an Int would give one less.
+     */
+    fun stop(value: Float): Int = Math.round(value)
+
+    /** How many steps a settings slider over [range] needs for every whole number in it to be a stop. */
+    fun stops(range: IntRange): Int = (range.last - range.first - 1).coerceAtLeast(0)
+
     /** Which step [level] stands for, 0 to [steps]: what an item hands to the system (a volume index). */
     fun step(level: Float, steps: Int): Int = if (steps <= 0) 0 else Math.round(snap(level, steps) * steps)
 
