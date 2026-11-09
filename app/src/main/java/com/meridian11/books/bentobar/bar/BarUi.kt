@@ -197,6 +197,8 @@ interface StripEvents {
     fun hover(inside: Boolean)
     /** Where an item (or "chevron") was drawn, in window coordinates. */
     fun placed(id: String, at: Rect)
+    /** [id] is no longer drawn (it left, or FitRow had no room for it): its last place is out of date. */
+    fun gone(id: String) {}
     /** The pointer is over [item] (or has left it), for its tooltip. */
     fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {}
     /** The wheel over the strip, where no item uses it: [up] reveals hidden items, down folds them. */
@@ -319,7 +321,7 @@ fun Strip(
         val items = if (chevronOnLeft) revealed + visible else visible + revealed
         if (chevronOnLeft) chevron()
         FitRow(ids = items.map { it.item.id }, maxWidthPx = maxWidthPx, chevronAlways = chevronAlways, chevronPx = chevronReservePx,
-            keepEnd = chevronOnLeft, spacing = look.spacing, onDropped = { ids -> glow.dropped(ids); onOverflow(ids) }) {
+            keepEnd = chevronOnLeft, spacing = look.spacing, onDropped = { ids -> glow.dropped(ids); ids.forEach(events::gone); onOverflow(ids) }) {
             // key(): remembered state (hover, held width) belongs to the item, not to its position,
             // or an item popping in would inherit its neighbour's width.
             items.forEach { androidx.compose.runtime.key(it.item.id) { ItemView(it, look, events, glow) } }
@@ -473,7 +475,7 @@ private fun FitRow(ids: List<String>, maxWidthPx: Int, chevronAlways: Boolean, c
 @Composable
 private fun Chevron(expanded: Boolean, onLeft: Boolean, look: StripLook, events: StripEvents, glow: Glow) {
     var bounds by remember { mutableStateOf(Rect()) }
-    DisposableEffect(glow) { onDispose { glow.gone("chevron") } }
+    DisposableEffect(glow) { onDispose { glow.gone("chevron"); events.gone("chevron") } }
     // Hidden items sit on the chevron's far side; the arrow points where they'll appear.
     val sym = if (onLeft != expanded) Sym.CHEVRON_LEFT else Sym.CHEVRON_RIGHT
     val label = androidx.compose.ui.res.stringResource(if (expanded) com.meridian11.books.bentobar.R.string.chevron_hide else com.meridian11.books.bentobar.R.string.chevron_show)
@@ -526,7 +528,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
         if (lifted) glow.lift(true)
         onDispose { if (lifted) glow.lift(false) }
     }
-    DisposableEffect(entry.item.id) { onDispose { glow.gone(entry.item.id) } }
+    DisposableEffect(entry.item.id) { onDispose { glow.gone(entry.item.id); events.gone(entry.item.id) } }
     val liftScale by androidx.compose.animation.core.animateFloatAsState(if (lifted) 1.08f else 1f,
         Motion.spec(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMedium)), label = "lift")
     // Live numbers (speeds, percentages, clocks) sit in a fixed slot sized for their widest

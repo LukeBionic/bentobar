@@ -629,6 +629,8 @@ class BarController(private val service: AccessibilityService) {
     private val events = object : StripEvents {
         override fun placed(id: String, at: Rect) { placed[id] = at }
 
+        override fun gone(id: String) { placed -= id }
+
         override fun click(item: ItemConfig, at: Rect) {
             placed[item.id] = at
             // A click ends the hover's tooltip, whatever it does next (a screenshot must not catch it).
@@ -837,8 +839,7 @@ class BarController(private val service: AccessibilityService) {
         val onStrip = (ev.rawX != 0f || ev.rawY != 0f) && strip.shown &&
             x >= 0 && x < strip.params.width && y >= 0 && y < (snap?.bar?.height() ?: 0)
         // The same rule as the highlight's: a press in a gap belongs to the item on its side of the gap's middle.
-        val hit = if (onStrip) StripHighlight.target(x, placed.map { (k, r) -> Span(k, r.left.toFloat(), r.right.toFloat()) }.sortedBy { it.left }, null)
-            else null
+        val hit = if (onStrip) PopupRules.pressedItem(x, placed.map { (k, r) -> Span(k, r.left.toFloat(), r.right.toFloat()) }) else null
         val own = if (key == "bentobar") "chevron" else key.substringAfter(':')
         when (hit) {
             null -> closeMenu()

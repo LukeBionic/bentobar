@@ -13,4 +13,10 @@ internal object PopupRules {
         if (open != "bentobar" && !open.startsWith("item:")) return false
         return open != "item:$hovered"
     }
+
+    /**
+     * The item a press at [x] on the strip belongs to, of the items [drawn] now: the highlight's own rule, a gap going to
+     * the item on its side of the middle. An item that has gone must not be in [drawn]: its old box would take the press.
+     */
+    fun pressedItem(x: Float, drawn: List<Span>): String? = StripHighlight.target(x, drawn.sortedBy { it.left }, null)
 }
