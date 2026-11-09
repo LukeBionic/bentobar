@@ -57,7 +57,7 @@ internal class MenuCoordinator(
             closeMenu(dissolve = true)
             // From the list of every item, an item's menu opens under the item itself.
             val anchor = placed[item.id]?.takeIf { everything } ?: at
-            if (type != null && type.onClick(item)) Ticker.refresh()
+            if (type != null && Ticker.guarded(type, "onClick") { type.onClick(item) } == true) Ticker.refresh()
             else if (type?.menu != null) toggleMenu(MenuKey.Item(item.id), anchor, type.menuWidthDp) { h -> ItemMenu(item.id, h) }
         }, hideBar = { Store.update { it.copy(enabled = false) } }, everything = everything)
     }
@@ -91,7 +91,7 @@ internal class MenuCoordinator(
         val s = facts.snapshot ?: return
         // Before the popup's first frame reads anything (an item's own LaunchedEffect would run after it).
         (key as? MenuKey.Item)?.id?.let { id ->
-            Store.config.value.items.firstOrNull { it.id == id }?.let { Items.of(it.type)?.menuOpening(it) }
+            Store.config.value.items.firstOrNull { it.id == id }?.let { i -> Items.of(i.type)?.let { t -> Ticker.guarded(t, "menuOpening") { t.menuOpening(i) } } }
         }
         val loc = strip.locationOnScreen()
         val a = Rect(anchor).apply { offset(loc[0], loc[1]) }

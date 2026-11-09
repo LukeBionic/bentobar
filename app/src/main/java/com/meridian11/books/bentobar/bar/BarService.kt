@@ -505,7 +505,8 @@ class BarController(private val service: AccessibilityService) {
             // A click ends the hover's tooltip, whatever it does next (a screenshot must not catch it).
             menus.hideTip()
             val type = Items.of(item.type) ?: return
-            if (type.onClick(item)) { Ticker.refresh(); return }
+            val clicked = Ticker.guarded(type, "onClick") { type.onClick(item) } ?: return
+            if (clicked) { Ticker.refresh(); return }
             if (type.menu == null) return
             menus.toggleMenu(MenuKey.Item(item.id), at, type.menuWidthDp) { host -> ItemMenu(item.id, host) }
         }
@@ -521,7 +522,7 @@ class BarController(private val service: AccessibilityService) {
         }
 
         override fun scroll(item: ItemConfig, steps: Int) {
-            Items.of(item.type)?.onScroll(item, steps)
+            Items.of(item.type)?.let { t -> Ticker.guarded(t, "onScroll") { t.onScroll(item, steps) } }
             Ticker.refresh()
         }
 
@@ -529,7 +530,7 @@ class BarController(private val service: AccessibilityService) {
         override fun slide(item: ItemConfig, level: Float, done: Boolean) {
             sliding = !done
             menus.hideTip()
-            Items.of(item.type)?.onSlide(item, level, done)
+            Items.of(item.type)?.let { t -> Ticker.guarded(t, "onSlide") { t.onSlide(item, level, done) } }
             Ticker.refresh(item)
         }
 

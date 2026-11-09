@@ -75,10 +75,13 @@ object Ticker {
         ids.forEach { lastRun -= it; lastActive -= it; heldFor -= it }
     }
 
-    private inline fun hook(type: String, what: String, call: (ItemType) -> Unit) {
+    private fun hook(type: String, what: String, call: (ItemType) -> Unit) {
         val t = Items.of(type) ?: return
-        try { call(t) } catch (e: Throwable) { failed(t, "$what of $type failed", e) }
+        guarded(t, what) { call(t) }
     }
+
+    /** [type]'s own code, behind [ItemGuard]: a click, a wheel step, a slider as much as a sampler or a hook. Null when it failed. */
+    fun <T> guarded(type: ItemType, what: String, call: () -> T): T? = ItemGuard.run(kindOnly(type), "$what of ${type.type} failed", ::log, call)
 
     /**
      * A type's own code failed: the tick goes on without it (also for a method this device's Android
@@ -86,10 +89,11 @@ object Ticker {
      * or shows the user's own things only its kind: an exception's message can quote what was being
      * read (a reply, a title).
      */
-    private fun failed(type: ItemType, what: String, e: Throwable) {
-        if (e is VirtualMachineError) throw e
-        if (type.online != null || type.discreet) Log.w(TAG, "$what: ${e.javaClass.simpleName}") else Log.w(TAG, what, e)
-    }
+    private fun failed(type: ItemType, what: String, e: Throwable) = ItemGuard.failed(kindOnly(type), what, e, ::log)
+
+    private fun kindOnly(type: ItemType) = type.online != null || type.discreet
+
+    private fun log(what: String, e: Throwable?) { if (e == null) Log.w(TAG, what) else Log.w(TAG, what, e) }
 
     /**
      * The items sampled at this tick ([needed]), set before the types' samplers run: for a type whose
@@ -204,16 +208,17 @@ object Ticker {
         val types = live.mapTo(HashSet()) { it.type }
         // Only while something shows items: a refresh() with nothing on screen must not wake a type that nobody would put back to sleep.
         lifeCycle(if (users.isEmpty()) emptySet() else types)
-        try {
+        ItemGuard.run(false, "sampling failed", ::log) {
             // A type may read another type's sampler (Heat reads the battery's temperature): those run for it too.
             val sampled = HashSet(types)
             for (t in types) Items.of(t)?.samples?.let { sampled += it }
             Env.tick(now, sampled)
             if (users.isNotEmpty()) for (t in types) hook(t, "sample") { it.sample(Now.elapsed()) }
+        }
+        // Behind a guard of their own: a sampler that fails must not cost a timer or keep awake this tick's look at the clock.
+        ItemGuard.run(false, "clock check failed", ::log) {
             Timers.check()
             Caffeine.check()
-        } catch (e: Exception) {
-            Log.w(TAG, "sampling failed", e)
         }
         val next = HashMap(_states.value)
         val ids = HashSet<String>()
