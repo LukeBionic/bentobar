@@ -71,6 +71,9 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     a place. A type gets `onLive()`,
     `sample(now)` once a second and `onIdle()` from the `Ticker`: listeners and polls hang on those,
     so none exists while the bar is hidden, the screen is off or no such item is outside Off.
+    One exception: `DisplaysItem`'s display listener also lives while "Keep awake while connected" is in force (an
+    item outside Off has it on and the service is up, `DisplaysItem.follow`), sampled or not. That option is a
+    promise about the screen staying on while the bar is hidden, so the bar hiding must not end it.
   - `items/Refresher.kt` is `Calendar`'s way of loading as one class (a background thread, one load
     per key, an immutable snapshot, a generation counter); `items/Ask.kt` is the same for one
     question at a time (a search). Both are pure Kotlin; `items/Background.kt` wires them to the app.

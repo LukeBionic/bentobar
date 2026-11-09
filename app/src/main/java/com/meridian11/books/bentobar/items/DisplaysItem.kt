@@ -46,13 +46,21 @@ object DisplaysItem : ItemType("displays", R.string.item_displays_title, Sym.DES
     override val addsWhenActive = true
     override val trigger = Trigger(R.string.trigger_displays, R.string.trigger_displays_short)
 
-    /** True while an external display is connected and a live Displays item has "Keep awake while connected" on. */
+    /**
+     * True while an external display is connected and a Displays item outside Off has "Keep awake while connected" on.
+     * Kept up to date by [follow], whatever is being sampled: the promise is about the screen, and a bar hidden by a
+     * full-screen app is exactly when it matters.
+     */
     val keepingAwake = MutableStateFlow(false)
 
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var screens: List<Screen> = emptyList()
     @Volatile private var staged: List<Screen>? = null
     private var listening = false
+    /** An item is being sampled: between [onLive] and [onIdle]. */
+    private var live = false
+    /** The accessibility service is up and the layout asks to keep awake ([follow]). */
+    private var ruled = false
 
     private val listener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) = refreshScreens()
@@ -91,24 +99,45 @@ object DisplaysItem : ItemType("displays", R.string.item_displays_title, Sym.DES
     }
 
     private fun syncAwake() {
-        val want = DisplaysRules.wantAwake(Store.config.value.items, currentScreens())
+        val want = ruled && DisplaysRules.wantAwake(Store.config.value.items, currentScreens())
         if (keepingAwake.value != want) keepingAwake.value = want
     }
 
-    override fun onLive() {
-        screens = readScreens()
-        if (!listening) {
-            listening = runCatching { displayManager()?.registerDisplayListener(listener, main) }.isSuccess
+    /** The display listener lives while something needs it: a sampled item, or the rule in force. */
+    private fun syncListener() {
+        val want = live || ruled
+        if (want == listening) return
+        val dm = displayManager()
+        listening = if (want) runCatching { dm?.registerDisplayListener(listener, main) }.isSuccess
+        else { runCatching { dm?.unregisterDisplayListener(listener) }; false }
+    }
+
+    /**
+     * From the service, on every change of the layout and when it stops ([serviceUp] false): whether the rule is in
+     * force, apart from sampling, which stops while the bar is hidden and never starts for an item folded behind ‹.
+     * While it is in force the listener lives (the one exception to "listeners hang on onLive", see AGENTS.md) so
+     * a monitor coming or going is heard; the wake lock's own guard still keeps the lock screen out of it.
+     */
+    fun follow(serviceUp: Boolean) {
+        val now = serviceUp && DisplaysRules.ruleOn(Store.config.value.items)
+        if (now != ruled) {
+            ruled = now
+            if (now) screens = readScreens()
+            syncListener()
         }
         syncAwake()
     }
 
+    override fun onLive() {
+        screens = readScreens()
+        live = true
+        syncListener()
+        syncAwake()
+    }
+
     override fun onIdle() {
-        if (listening) {
-            runCatching { displayManager()?.unregisterDisplayListener(listener) }
-            listening = false
-        }
-        keepingAwake.value = false
+        live = false
+        syncListener()
     }
 
     override fun sample(now: Long) {

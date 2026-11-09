@@ -263,6 +263,7 @@ class BarController(private val service: AccessibilityService) {
         main.removeCallbacksAndMessages(null) // after closeMenu, which posts a collapse
         strip.destroy()
         if (screenLock.isHeld) screenLock.release()
+        DisplaysItem.follow(false)
         Ticker.stop("bar")
         scope.cancel()
         io.shutdown()
@@ -297,6 +298,7 @@ class BarController(private val service: AccessibilityService) {
 
     private fun onConfig() {
         if (!started) return
+        DisplaysItem.follow(true)
         // Colour back to "Match the status bar": read the bar again (nothing else would until it changes).
         Store.config.value.color.let { if (it != lastColor) { if (it == ColorMode.AUTO && lastColor != null) readSoon(ColorWatch.Cause.QUICK, 100); lastColor = it } }
         // Switched to Show everything (or presenting) with hidden items out: nothing can fold them back.
