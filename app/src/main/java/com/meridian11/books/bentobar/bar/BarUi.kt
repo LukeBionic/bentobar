@@ -264,8 +264,8 @@ fun Strip(
         glow.frames { if (Motion.off) 0f else context[MotionDurationScale]?.scaleFactor ?: 1f }
     }
     // The strip's order runs left to right in every language: ‹ and its side, which items are kept when room runs out and where a
-    // dragged item lands are all physical, and the system's status bar doesn't mirror for an app's strip either. Inside an item
-    // the real direction holds ([ItemView]), so its icon and words, its slider and its route line read as the language does.
+    // dragged item lands are all physical. Inside an item the real direction holds ([ItemView]), so its icon and words, its slider
+    // and its route line read as the language does.
     val real = LocalLayoutDirection.current
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { Row(
         Modifier.height(heightDp)
