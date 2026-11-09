@@ -133,6 +133,7 @@ class HttpTest {
         val r = Request(Host.FINNHUB, "/api/v1/quote", listOf("symbol" to "AAPL"))
         assertEquals("https://api.finnhub.io/api/v1/quote?symbol=AAPL&token=a%26b", HttpTransport.address(r, "a&b"))
         assertEquals("https://api.finnhub.io/api/v1/quote?symbol=AAPL", HttpTransport.address(r))
+        assertEquals("AirLabs takes its key as api_key", "https://airlabs.co/api/v9/flight?flight_iata=LH455&api_key=k", HttpTransport.address(Request(Host.AIRLABS, "/api/v9/flight", listOf("flight_iata" to "LH455")), "k"))
         assertEquals("a host that takes none gets none", "https://api.open-meteo.com/v1/forecast?latitude=47.37&longitude=8.55", HttpTransport.address(forecast, "a-key"))
         assertEquals(listOf("symbol" to "AAPL"), r.query)
     }
