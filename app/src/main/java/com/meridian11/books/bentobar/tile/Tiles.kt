@@ -57,7 +57,7 @@ class AwakeTile : TileService() {
             !Env.running -> getString(R.string.tile_set_up_bentobar)
             !on -> getString(R.string.common_off)
             Caffeine.until.value == Caffeine.FOREVER -> getString(R.string.common_on)
-            else -> Fmt.duration(Caffeine.until.value - System.currentTimeMillis())
+            else -> Fmt.duration(Caffeine.left(Caffeine.until.value))
         }
         t.updateTile()
     }

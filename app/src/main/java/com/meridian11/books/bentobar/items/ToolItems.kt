@@ -72,7 +72,7 @@ import java.util.Locale
 object Caffeine {
     const val FOREVER = Long.MAX_VALUE
     val until = MutableStateFlow(0L)
-    private var anchor = ClockAnchor(0, 0, -1)
+    internal var anchor = ClockAnchor(0, 0, -1)
 
     fun init(context: Context) {
         val p = context.getSharedPreferences("caffeine", Context.MODE_PRIVATE)
@@ -84,7 +84,9 @@ object Caffeine {
     fun on(minutes: Int?) = set(if (minutes == null) FOREVER else System.currentTimeMillis() + minutes * 60_000L)
     fun off() = set(0)
     fun toggle(minutes: Int?) = if (active()) off() else on(minutes)
-    fun active(now: Long = System.currentTimeMillis()) = until.value > now
+
+    /** On in real time, as [left] counts it: after a clock change [until] is out of date until the next [check], and while the bar is hidden no tick is there to do that. */
+    fun active(now: ClockAnchor = ClockAnchor.now(Env.app)) = until.value.let { it == FOREVER || (it != 0L && anchor.left(it, now) > 0) }
 
     /** Real time until [deadline] (an [until]), so a clock change can't move when keep awake lets go. */
     fun left(deadline: Long) = anchor.left(deadline, ClockAnchor.now(Env.app))
