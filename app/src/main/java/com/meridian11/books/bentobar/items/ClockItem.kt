@@ -102,6 +102,7 @@ private fun words(h24: Boolean) = WorldClock.Words(
 )
 
 object ClockItem : ItemType("clock", R.string.item_clock_title, Sym.SCHEDULE, R.string.item_clock_desc) {
+    override val group = ItemGroup.TIME
     // A rule without a number: a clock of home that shows only while the device is somewhere else.
     override val canBeActive = true
     override val trigger = Trigger(R.string.trigger_clock, R.string.trigger_clock_short)

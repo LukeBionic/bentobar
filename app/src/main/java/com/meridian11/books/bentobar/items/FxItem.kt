@@ -17,6 +17,8 @@ import kotlin.math.abs
  * an inline converter in its menu. No logging.
  */
 object FxItem : ItemType("fx", R.string.item_fx_title, Sym.SWAP_VERT, R.string.item_fx_desc) {
+    override val group = ItemGroup.ONLINE
+    override val onlineNote = R.string.about_privacy_fx
     override val menuWidthDp = 340
     override val online = Online.Service.FRANKFURTER
     override val canBeActive = true

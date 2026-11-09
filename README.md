@@ -218,7 +218,7 @@ show the whole system instead.
 | Approximate location *(optional)* | Weather's My location, rounded to about 10 km before it is sent |
 | Alarms and reminders *(optional)* | timers that ring on the second while the Googlebook sleeps |
 | Usage access *(optional)* | the apps using the most data today and the largest apps, in the Network and Storage menus |
-| Internet | Weather (Open-Meteo), Flight (AirLabs) and US stocks (Finnhub), only after you set them up; nothing else |
+| Internet | Weather and Air quality & UV (Open-Meteo), Flight (AirLabs), US stocks (Finnhub) and Exchange rates (Frankfurter), only after you set them up; nothing else |
 | Notification access *(optional)* | Now playing's title, artist and artwork; BentoBar receives no notifications |
 | Network state, launcher apps | the network menu, and picking apps for shortcuts |
 

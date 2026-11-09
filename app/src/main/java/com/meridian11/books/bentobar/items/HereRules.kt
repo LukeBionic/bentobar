@@ -109,5 +109,5 @@ object HereRules {
      * way. An item in Off keeps its choice, and where the device is is found again when it comes back.
      */
     fun wanted(items: List<ItemConfig>, on: Boolean): Boolean =
-        on && items.any { (it.type == "weather" || it.type == "air") && it.section != Section.OFF && WeatherRules.here(it) }
+        on && items.any { Items.of(it.type)?.usesMyLocation == true && it.section != Section.OFF && WeatherRules.here(it) }
 }

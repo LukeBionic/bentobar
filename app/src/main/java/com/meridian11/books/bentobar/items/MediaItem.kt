@@ -21,6 +21,7 @@ import com.meridian11.books.bentobar.util.Sym
  * when something last played and which app that was.
  */
 object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, R.string.item_media_desc) {
+    override val group = ItemGroup.TOOLS
     override val canBeActive = true
     override val addsWhenActive = true
     override val notificationAccess = true

@@ -97,6 +97,7 @@ import java.util.Locale
  * timed or all-day (meetings, flights, holidays, birthdays), with Join and Directions where they apply.
  */
 object CalendarItem : ItemType("calendar", R.string.item_calendar_title, Sym.CALENDAR_MONTH, R.string.item_calendar_desc) {
+    override val group = ItemGroup.TIME
     override val refreshMs = 10_000L
     // Room for Join and Directions next to an event in the agenda.
     override val menuWidthDp = 340
@@ -287,6 +288,8 @@ fun EventRow(e: Calendar.Event, close: () -> Unit) {
  * left in that horizon, just the icon. The menu lists the horizon's meetings.
  */
 object EventItem : ItemType("event", R.string.item_event_title, Sym.GROUPS, R.string.item_event_desc) {
+    override val group = ItemGroup.TIME
+    override val presents = true
     override val refreshMs = 5_000L
     // Room for Join and Directions next to a meeting.
     override val menuWidthDp = 340
@@ -354,6 +357,8 @@ object EventItem : ItemType("event", R.string.item_event_title, Sym.GROUPS, R.st
 }
 
 object TimerItem : ItemType("timer", R.string.item_timer_title, Sym.TIMER, R.string.item_timer_desc) {
+    override val group = ItemGroup.TIME
+    override val presents = true
     override val canBeActive = true
     // Room for the four presets and Custom on one line.
     override val menuWidthDp = 380
@@ -486,6 +491,8 @@ private fun CustomMinutes(onStart: (Int) -> Unit) {
 }
 
 object CountdownItem : ItemType("countdown", R.string.item_countdown_title, Sym.HOURGLASS_TOP, R.string.item_countdown_desc) {
+    override val group = ItemGroup.TIME
+    override val presents = true
     override val refreshMs = 10_000L
     override val canBeActive = true
     override val trigger = Trigger(R.string.trigger_countdown, R.string.trigger_countdown_short)

@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
  * ticker compute the items of its type again, so the bar and an open menu show it at once.
  */
 object Background {
-    private val main = Handler(Looper.getMainLooper())
+    private val main by lazy { Handler(Looper.getMainLooper()) }
     /** What to forget when a service is switched off: the snapshots of the refreshers and the answers of the asks made for it. */
     private val forServices = ArrayList<Pair<Online.Service, () -> Unit>>()
     private val threads = HashMap<String, Executor>()

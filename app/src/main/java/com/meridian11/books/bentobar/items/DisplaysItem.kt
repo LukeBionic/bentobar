@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * without any extra permission.
  */
 object DisplaysItem : ItemType("displays", R.string.item_displays_title, Sym.DESKTOP_WINDOWS, R.string.item_displays_desc) {
+    override val group = ItemGroup.SYSTEM
     override val refreshMs = 5_000L
     override val canBeActive = true
     override val addsWhenActive = true
@@ -53,7 +54,7 @@ object DisplaysItem : ItemType("displays", R.string.item_displays_title, Sym.DES
      */
     val keepingAwake = MutableStateFlow(false)
 
-    private val main = Handler(Looper.getMainLooper())
+    private val main by lazy { Handler(Looper.getMainLooper()) }
     @Volatile private var screens: List<Screen> = emptyList()
     @Volatile private var staged: List<Screen>? = null
     private var listening = false

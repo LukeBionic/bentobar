@@ -67,6 +67,7 @@ import com.meridian11.books.bentobar.data.TextSize
 import com.meridian11.books.bentobar.data.SPACING_DP
 import com.meridian11.books.bentobar.data.spacingDp
 import com.meridian11.books.bentobar.items.Env
+import com.meridian11.books.bentobar.items.ItemGroup
 import com.meridian11.books.bentobar.items.Items
 import com.meridian11.books.bentobar.items.MediaAccess
 import com.meridian11.books.bentobar.items.Notify
@@ -96,20 +97,13 @@ private fun PageLabel(text: String) {
 @Composable
 fun AddPage(onAdded: (String) -> Unit) {
     val cfg by Store.config.collectAsState()
-    val groups = listOf(
-        AddGroup(R.string.add_group_system, listOf("cpu", "network", "memory", "battery", "storage", "heat", "devices", "displays")),
-        AddGroup(R.string.add_group_time, listOf("calendar", "event", "clock", "timer", "countdown")),
-        AddGroup(R.string.add_group_tools, listOf("caffeine", "media", "sound", "clipboard", "tools", "shortcut", "folder", "app", "text", "spacer")),
-        // The only items that go online, in a group that says so.
-        AddGroup(R.string.add_group_online, listOf("weather", "air", "flight", "stocks", "fx"), caption = R.string.add_group_online_caption),
-    )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp)) {
-        groups.forEach { (group, types, caption) ->
-            SectionLabel(stringResource(group))
-            if (caption != null) Text(stringResource(caption), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
+        ItemGroup.entries.forEach { group ->
+            SectionLabel(stringResource(group.title))
+            group.caption?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp)) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                types.mapNotNull { Items.of(it) }.forEach { type ->
+                Items.inGroup(group).forEach { type ->
                     val count = cfg.items.count { it.type == type.type }
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                         modifier = Modifier.width(280.dp)) {
@@ -153,9 +147,6 @@ fun AddPage(onAdded: (String) -> Unit) {
         }
     }
 }
-
-/** A group of the catalog: its heading, the types in it, and a line under the heading where the group needs one. */
-private data class AddGroup(val title: Int, val types: List<String>, val caption: Int? = null)
 
 // ---- Look ----------------------------------------------------------------------------------
 
@@ -369,22 +360,29 @@ fun SetupPage(activity: Activity, setup: SetupState, onTurnOn: () -> Unit) {
         Step(8, stringResource(R.string.setup_online_title), online.on.isNotEmpty(), optional = true) {
             Body(stringResource(R.string.setup_online_text))
             Spacer(Modifier.height(4.dp))
-            OnlineSwitch(Online.Service.OPEN_METEO, online, stringResource(R.string.setup_online_weather), stringResource(R.string.setup_online_weather_first))
-            OnlineSwitch(Online.Service.AIRLABS, online, stringResource(R.string.setup_online_flights), stringResource(R.string.setup_online_flights_first))
-            // The key outlives the Flight item it was typed into: without this, taking it off the device
-            // would mean adding a Flight item again first.
-            if (Online.Service.AIRLABS in online.keyed) TextButton(onClick = { Online.removeKey(Online.Service.AIRLABS); Ticker.refresh() }) {
-                Text(stringResource(R.string.flight_remove_key), color = MaterialTheme.colorScheme.error)
+            Online.Service.entries.forEach { service ->
+                val row = onlineRow(service)
+                OnlineSwitch(service, online, stringResource(row.label), stringResource(row.first))
+                // The key outlives the item it was typed into: without this, taking it off the device
+                // would mean adding that item again first.
+                if (row.removeKey != null && service in online.keyed) TextButton(onClick = { Online.removeKey(service); Ticker.refresh() }) {
+                    Text(stringResource(row.removeKey), color = MaterialTheme.colorScheme.error)
+                }
             }
-            OnlineSwitch(Online.Service.FINNHUB, online, stringResource(R.string.setup_online_stocks), stringResource(R.string.setup_online_stocks_first))
-            if (Online.Service.FINNHUB in online.keyed) TextButton(onClick = { Online.removeKey(Online.Service.FINNHUB); Ticker.refresh() }) {
-                Text(stringResource(R.string.stocks_remove_key), color = MaterialTheme.colorScheme.error)
-            }
-            OnlineSwitch(Online.Service.FRANKFURTER, online, stringResource(R.string.setup_online_fx), stringResource(R.string.setup_online_fx_first))
             Text(stringResource(R.string.setup_online_off_note), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+/** Setup's row for an online service: every [Online.Service] has one, or this doesn't compile. */
+internal data class OnlineRow(val label: Int, val first: Int, val removeKey: Int? = null)
+
+internal fun onlineRow(service: Online.Service): OnlineRow = when (service) {
+    Online.Service.OPEN_METEO -> OnlineRow(R.string.setup_online_weather, R.string.setup_online_weather_first)
+    Online.Service.AIRLABS -> OnlineRow(R.string.setup_online_flights, R.string.setup_online_flights_first, R.string.flight_remove_key)
+    Online.Service.FINNHUB -> OnlineRow(R.string.setup_online_stocks, R.string.setup_online_stocks_first, R.string.stocks_remove_key)
+    Online.Service.FRANKFURTER -> OnlineRow(R.string.setup_online_fx, R.string.setup_online_fx_first)
 }
 
 /**
@@ -484,11 +482,7 @@ fun AboutPage() {
         PageLabel(stringResource(R.string.about_privacy))
         Body(stringResource(R.string.about_privacy_text))
         Spacer(Modifier.height(4.dp))
-        Bullet(stringResource(R.string.about_privacy_weather))
-        Bullet(stringResource(R.string.about_privacy_air))
-        Bullet(stringResource(R.string.about_privacy_flight))
-        Bullet(stringResource(R.string.about_privacy_stocks))
-        Bullet(stringResource(R.string.about_privacy_fx))
+        Items.all.filter { it.online != null }.mapNotNull { it.onlineNote }.forEach { Bullet(stringResource(it)) }
         Bullet(stringResource(R.string.about_privacy_clipboard))
         Bullet(stringResource(R.string.about_privacy_media))
         Bullet(stringResource(R.string.about_privacy_others))

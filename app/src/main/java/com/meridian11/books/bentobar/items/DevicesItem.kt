@@ -52,6 +52,7 @@ import com.meridian11.books.bentobar.util.SymIcon
  * Which devices are listed and what the bar makes of them is in [DevicesRules].
  */
 object DevicesItem : ItemType("devices", R.string.item_devices_title, Sym.MOUSE, R.string.item_devices_desc) {
+    override val group = ItemGroup.SYSTEM
     override val refreshMs = 5_000L
     override val canBeActive = true
     override val addsWhenActive = true
@@ -78,7 +79,7 @@ object DevicesItem : ItemType("devices", R.string.item_devices_title, Sym.MOUSE,
     // At most one reading a second, however often Android reports: one that can't be taken now (another is under
     // way, or the last is under a second old) is asked for again on the next tick, never queued behind the other.
     private val watch = DevicesWatch { !readings.loading(Unit) && readings.refresh(Unit, floorMs = DevicesRules.FLOOR_MS) }
-    private val main = Handler(Looper.getMainLooper())
+    private val main by lazy { Handler(Looper.getMainLooper()) }
     private val listener = object : InputManager.InputDeviceListener {
         override fun onInputDeviceAdded(deviceId: Int) = changed()
         override fun onInputDeviceRemoved(deviceId: Int) = changed()

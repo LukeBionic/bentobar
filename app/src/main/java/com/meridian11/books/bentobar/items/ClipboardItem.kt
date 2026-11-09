@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * What someone copies or pins is their own business ([discreet]): no snippet text is ever logged.
  */
 object ClipboardItem : ItemType("clipboard", R.string.item_clipboard_title, Sym.CONTENT_PASTE, R.string.item_clipboard_desc) {
+    override val group = ItemGroup.TOOLS
     override val menuWidthDp = 340
     override val canBeActive = true
     override val discreet = true

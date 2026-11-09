@@ -37,6 +37,8 @@ import java.util.Locale
  * shows. The rule is [CpuRule]; the status is [Heat]'s, the one the Heat item shows too.
  */
 object CpuItem : ItemType("cpu", R.string.item_cpu_title, Sym.MEMORY, R.string.item_cpu_desc) {
+    override val group = ItemGroup.SYSTEM
+    override val holds = true
     override val canBeActive = true
     private val above = Threshold("activePct", 80, 30..99) { "$it%" }
     // With the switch on, the rule's words say so: "…, or the device runs hot".

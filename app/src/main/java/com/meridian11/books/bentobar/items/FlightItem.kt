@@ -40,6 +40,8 @@ import java.util.Locale
  * description, no tooltip and nothing a debug hook prints.
  */
 object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R.string.item_flight_desc) {
+    override val group = ItemGroup.ONLINE
+    override val onlineNote = R.string.about_privacy_flight
     override val refreshMs = 10_000L
     override val menuWidthDp = 340
     override val online = Online.Service.AIRLABS

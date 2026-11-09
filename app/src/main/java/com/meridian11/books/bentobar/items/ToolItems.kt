@@ -109,6 +109,7 @@ object Caffeine {
 }
 
 object CaffeineItem : ItemType("caffeine", R.string.item_caffeine_title, Sym.COFFEE, R.string.item_caffeine_desc) {
+    override val group = ItemGroup.TOOLS
     override val canBeActive = true
     override val trigger = Trigger(R.string.trigger_caffeine, R.string.trigger_caffeine_short)
     private val durations = listOf(15, 30, 60, 120, 240)
@@ -167,6 +168,7 @@ object CaffeineItem : ItemType("caffeine", R.string.item_caffeine_title, Sym.COF
 }
 
 object ToolsItem : ItemType("tools", R.string.item_tools_title, Sym.HANDYMAN, R.string.item_tools_desc) {
+    override val group = ItemGroup.TOOLS
     override val menuWidthDp = 392
     private data class Tool(val icon: String, @StringRes val label: Int, val run: () -> Unit)
 
@@ -312,6 +314,7 @@ fun AppPicker(selected: List<ComponentName>, multi: Boolean, onChange: (List<Com
 }
 
 object AppItem : ItemType("app", R.string.item_app_title, Sym.ROCKET_LAUNCH, R.string.item_app_desc) {
+    override val group = ItemGroup.TOOLS
     override val refreshMs = 60_000L
 
     private data class Key(val cn: ComponentName, val mono: Boolean)
@@ -350,6 +353,7 @@ object AppItem : ItemType("app", R.string.item_app_title, Sym.ROCKET_LAUNCH, R.s
 }
 
 object FolderItem : ItemType("folder", R.string.item_folder_title, Sym.GRID_VIEW, R.string.item_folder_desc) {
+    override val group = ItemGroup.TOOLS
     override val menuWidthDp = 340
     override fun state(item: ItemConfig) = ItemState(icon = Sym.GRID_VIEW, text = item.opt("label", Env.str(R.string.common_apps)), desc = Env.str(R.string.item_folder_title))
 
@@ -391,6 +395,7 @@ object FolderItem : ItemType("folder", R.string.item_folder_title, Sym.GRID_VIEW
 }
 
 object TextItem : ItemType("text", R.string.item_text_title, Sym.TEXT_FIELDS, R.string.item_text_desc) {
+    override val group = ItemGroup.TOOLS
     override fun state(item: ItemConfig) = ItemState(
         icon = item.options["icon"]?.let { iconChoices.toMap()[it] },
         text = item.opt("text", Env.str(R.string.text_default)), desc = item.opt("text", Env.str(R.string.text_default)),
@@ -425,6 +430,7 @@ object TextItem : ItemType("text", R.string.item_text_title, Sym.TEXT_FIELDS, R.
 }
 
 object SpacerItem : ItemType("spacer", R.string.item_spacer_title, Sym.SPACE_BAR, R.string.item_spacer_desc) {
+    override val group = ItemGroup.TOOLS
     override val refreshMs = 60_000L
 
     override fun state(item: ItemConfig) = ItemState(gapDp = item.spacerWidthDp, divider = item.optBool("line", false), desc = Env.str(R.string.spacer_desc))

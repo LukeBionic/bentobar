@@ -46,6 +46,7 @@ import kotlin.math.roundToInt
  * the item before there was a slider.
  */
 object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R.string.item_sound_desc) {
+    override val group = ItemGroup.TOOLS
     private const val STREAM = AudioManager.STREAM_MUSIC
 
     private fun am() = Env.app.getSystemService(AudioManager::class.java)

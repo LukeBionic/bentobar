@@ -16,6 +16,9 @@ import com.meridian11.books.bentobar.util.Sym
  * [WeatherItem]. No logging.
  */
 object AirItem : ItemType("air", R.string.item_air_title, Sym.AIR, R.string.item_air_desc) {
+    override val group = ItemGroup.ONLINE
+    override val onlineNote = R.string.about_privacy_air
+    override val usesMyLocation = true
     override val refreshMs = 10_000L
     override val menuWidthDp = 340
     override val online = Online.Service.OPEN_METEO

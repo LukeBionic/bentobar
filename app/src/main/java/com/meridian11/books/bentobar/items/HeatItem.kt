@@ -34,6 +34,7 @@ import com.meridian11.books.bentobar.util.Units
  * level asked every five seconds while an item is live); what it makes of it is in [HeatRules].
  */
 object HeatItem : ItemType("heat", R.string.item_heat_title, Sym.DEVICE_THERMOSTAT, R.string.item_heat_desc) {
+    override val group = ItemGroup.SYSTEM
     override val canBeActive = true
     override val addsWhenActive = true
     // The battery's sampler reads the thermal status and the battery's temperature; the CPU's is for the menu's "CPU load" row.

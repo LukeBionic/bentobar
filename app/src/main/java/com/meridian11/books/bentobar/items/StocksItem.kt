@@ -31,6 +31,8 @@ import java.util.Locale
  * description, no tooltip and nothing a debug hook prints.
  */
 object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_UP, R.string.item_stocks_desc) {
+    override val group = ItemGroup.ONLINE
+    override val onlineNote = R.string.about_privacy_stocks
     override val menuWidthDp = 340
     override val online = Online.Service.FINNHUB
     override val canBeActive = true

@@ -26,6 +26,9 @@ import java.util.concurrent.atomic.AtomicReference
  * ([WeatherSource], tested against a fake network); the menu and the settings are in `WeatherMenu.kt`.
  */
 object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY_CLOUDY_DAY, R.string.item_weather_desc) {
+    override val group = ItemGroup.ONLINE
+    override val onlineNote = R.string.about_privacy_weather
+    override val usesMyLocation = true
     override val refreshMs = 10_000L
     override val menuWidthDp = 340
     override val online = Online.Service.OPEN_METEO

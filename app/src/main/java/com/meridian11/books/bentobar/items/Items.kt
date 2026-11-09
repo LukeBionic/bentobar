@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 /** Every item type, in catalog order. */
 object Items {
     val all: List<ItemType> = listOf(
-        CpuItem, NetworkItem, BatteryItem, MemoryItem, StorageItem, HeatItem, DevicesItem, DisplaysItem,
+        CpuItem, NetworkItem, MemoryItem, BatteryItem, StorageItem, HeatItem, DevicesItem, DisplaysItem,
         CalendarItem, EventItem, ClockItem, TimerItem, CountdownItem,
         CaffeineItem, MediaItem, SoundItem, ClipboardItem, ToolsItem, ShortcutItem, FolderItem, AppItem, TextItem, SpacerItem,
         WeatherItem, AirItem, FlightItem, StocksItem, FxItem,
@@ -23,6 +23,9 @@ object Items {
     private val byType = all.associateBy { it.type }
 
     fun of(type: String): ItemType? = byType[type]
+
+    /** The types of [group], in catalog order: what Add lists under its heading. */
+    fun inGroup(group: ItemGroup): List<ItemType> = all.filter { it.group == group }
 }
 
 /**
@@ -191,7 +194,7 @@ object Ticker {
      */
     private fun held(type: ItemType, item: ItemConfig, now: Long): ItemState {
         val state = compute(type, item)
-        if (!TickRules.holds(type.type)) return state
+        if (!type.holds) return state
         if (heldFor[item.id] != item) { lastActive -= item.id; heldFor[item.id] = item }
         if (state.active) { lastActive[item.id] = now; return state }
         return if (TickRules.held(false, lastActive[item.id], now)) state.copy(active = true) else state
