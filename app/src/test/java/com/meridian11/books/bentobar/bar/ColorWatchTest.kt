@@ -421,6 +421,19 @@ class ColorWatchTest {
         assertTrue("the last change is read after it stopped", at.any { it > 600_000 })
     }
 
+    /** The gap holds for every reading of a stream that goes on: a cause's later readings and a change's follow-ups too. */
+    @Test fun inALongStreamEveryReadingKeepsTheGap() {
+        val watch = ColorWatch()
+        val at = ArrayList<Long>()
+        for (t in 0L..1_000_000L step 100) {
+            // The bar changes at every reading, so each one asks for its follow-up; and a SLOW cause every nine seconds.
+            if (watch.due(t) == 0L) { at += t; watch.shot(t, Result.CHANGED) }
+            if (t % 9_000 == 0L) watch.cause(Cause.SLOW, t, 250)
+        }
+        assertTrue("${at.filter { it in 90_000L..300_000L }.take(20)}", at.filter { it in 90_000L..300_000L }.zipWithNext().all { (a, b) -> b - a >= 10_000 })
+        assertTrue("${at.filter { it > 400_000 }.take(20)}", at.filter { it > 400_000 }.zipWithNext().all { (a, b) -> b - a >= 60_000 })
+    }
+
     /** Whatever the tier: two screenshots are never asked for within 400 ms. */
     @Test fun theLongStreamKeepsTheDistanceWhateverHappens() {
         for (seed in 1L..5L) {

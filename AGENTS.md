@@ -25,7 +25,7 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   - `bar/ColorReader.kt`: the strip's colours: when the bar is read (`ColorWatch` says), what a reading makes of the
     look (`StripLook`), the hints when there is no reading. The screenshot itself is `StatusBarScan.shoot`.
   - `bar/StatusBarScan.kt`: the edge of the window reading: the window list as `WindowFact`s (kind, id, bounds) and
-    the status bar window's node tree as `BarNode`s, for `BarRules`.
+    the status bar window's node tree as `BarNode`s, for `BarRules`, and the status bar's screenshot (`shoot`).
   - `bar/BarRules.kt`: what those facts mean, pure and unit-tested: which window is the status bar (TYPE_SYSTEM at
     y=0), the free area (the `DesktopStatusBarSpacer` node on Googlebook OS, else the widest gap), and `decide`: whether the
     strip shows, why not, what covers it, what to read. `BarController.check` collects the facts, asks, and does the
@@ -71,7 +71,8 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   - `bar/Menus.kt`: the popup's surface (`MenuSurface`: glass, clip to the shown glass, text colour) and its shadow
     (`MenuShadow`), the right-click item menu and the ‹ menu.
   - `items/`: `ItemType` + `ItemState`, `Items` registry + `Ticker` (1 Hz while anything is
-    visible), `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,
+    visible; `Ticker.guarded`, on the pure `ItemGuard`, is the one way a type's own code is run for input or sampling),
+    `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,
     glyph icons, `Chips` for the Live Update chip), `TextRules` (text from a layout or a reply as one line,
     counted as a reader counts it), and the item types: several each in
     `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own
