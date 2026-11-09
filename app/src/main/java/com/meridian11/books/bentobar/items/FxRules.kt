@@ -9,6 +9,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 import java.time.LocalDate
+import java.text.DecimalFormatSymbols
+import java.text.NumberFormat
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.math.abs
@@ -152,20 +154,25 @@ object FxRules {
         return out
     }
 
-    fun formatRate(rate: Double): String = when {
-        rate >= 100.0 -> String.format(Locale.US, "%.2f", rate)
-        rate >= 10.0 -> String.format(Locale.US, "%.3f", rate)
-        else -> String.format(Locale.US, "%.4f", rate)
+    // Figures in the device's own way of writing numbers, as Stocks does: a decimal comma where the keyboard offers one.
+    fun formatRate(rate: Double, locale: Locale = Locale.getDefault()): String = when {
+        rate >= 100.0 -> String.format(locale, "%.2f", rate)
+        rate >= 10.0 -> String.format(locale, "%.3f", rate)
+        else -> String.format(locale, "%.4f", rate)
     }
 
-    fun formatPct(pct: Double): String = String.format(Locale.US, "%.2f", abs(pct))
+    fun formatPct(pct: Double, locale: Locale = Locale.getDefault()): String = String.format(locale, "%.2f", abs(pct))
 
-    fun formatConverted(amount: Double, rate: Double): String {
+    fun formatConverted(amount: Double, rate: Double, locale: Locale = Locale.getDefault()): String {
         val v = amount * rate
-        return if (v >= 100.0) String.format(Locale.US, "%,.2f", v) else String.format(Locale.US, "%.2f", v)
+        return if (v >= 100.0) String.format(locale, "%,.2f", v) else String.format(locale, "%.2f", v)
     }
 
-    fun quoteFor(pair: FxPair, table: FxTable): PairQuote? {
+    /** An amount the user typed, for the line that repeats it: no grouping and no trailing zeros. */
+    fun formatAmount(amount: Double, locale: Locale = Locale.getDefault()): String =
+        NumberFormat.getNumberInstance(locale).apply { isGroupingUsed = false; maximumFractionDigits = 8 }.format(amount)
+
+    fun quoteFor(pair: FxPair, table: FxTable, locale: Locale = Locale.getDefault()): PairQuote? {
         val baseRate = table.latest[pair.base] ?: return null
         val quoteRate = table.latest[pair.quote] ?: return null
         if (baseRate <= 0.0) return null
@@ -176,14 +183,37 @@ object FxRules {
             val prevCross = prevQuote / prevBase
             if (prevCross > 0.0) ((cross - prevCross) / prevCross) * 100.0 else 0.0
         } else 0.0
-        return PairQuote(pair, cross, changePct, formatRate(cross), formatPct(changePct))
+        return PairQuote(pair, cross, changePct, formatRate(cross, locale), formatPct(changePct, locale))
     }
 
     fun quotesFor(pairs: List<FxPair>, table: FxTable): List<PairQuote> =
         pairs.mapNotNull { quoteFor(it, table) }
 
-    fun parseAmount(raw: String): Double? =
-        raw.trim().replace(",", "").toDoubleOrNull()?.takeIf { it > 0.0 && it <= 1_000_000_000.0 && it.isFinite() }
+    /**
+     * The amount [raw] says, in the way [locale] writes numbers; null for anything else. Read by hand rather than with
+     * NumberFormat, which takes "100,50" for 10050 where a comma groups thousands: a separator counts only where the
+     * locale's grouping can stand ([WRITTEN]). A space groups where the locale's grouping is a kind of space.
+     */
+    fun parseAmount(raw: String, locale: Locale = Locale.getDefault()): Double? {
+        val symbols = DecimalFormatSymbols.getInstance(locale)
+        val groups = symbols.groupingSeparator
+        val plain = StringBuilder(raw.length)
+        for (c in raw.trim()) {
+            val digit = Character.digit(c, 10)
+            plain.append(when {
+                digit >= 0 -> '0' + digit
+                c == symbols.decimalSeparator -> '.'
+                c == groups || (groups.isWhitespace() && c.isWhitespace()) -> ','
+                else -> return null
+            })
+        }
+        val text = plain.toString()
+        if (!WRITTEN.matches(text)) return null
+        return text.replace(",", "").toDoubleOrNull()?.takeIf { it > 0.0 && it <= 1_000_000_000.0 && it.isFinite() }
+    }
+
+    /** An amount with its separators made plain: whole, or grouped from the end in threes (twos, further left, in India), with its decimals. */
+    private val WRITTEN = Regex("""\d+(\.\d*)?|\.\d+|\d{1,3}(,\d{2,3})*,\d{3}(\.\d*)?""")
 
     fun every(table: FxTable): Long = if (table.failure != null) RETRY_MS else FRESH_MS
 

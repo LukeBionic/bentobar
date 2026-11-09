@@ -138,9 +138,8 @@ private fun FxQuoteRow(q: PairQuote, amount: Double?) {
             }
         }
         if (amount != null) {
-            val amtFmt = if (amount % 1.0 == 0.0) amount.toLong().toString() else amount.toString()
             Text(
-                stringResource(R.string.fx_converted, amtFmt, q.pair.base, FxRules.formatConverted(amount, q.rate), q.pair.quote),
+                stringResource(R.string.fx_converted, FxRules.formatAmount(amount), q.pair.base, FxRules.formatConverted(amount, q.rate), q.pair.quote),
                 style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
                 color = quiet,
             )

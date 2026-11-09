@@ -84,10 +84,11 @@ class HttpTransport(
         /**
          * The address of [request], or null if its path isn't a plain one: it must start with "/"
          * and hold only letters, digits and `. _ ~ -` between slashes (so no `//`, `@`, `?`, `#`,
-         * backslash or space), and no `..`.
+         * backslash or space), and no segment that is exactly `.` or `..`. Dots anywhere else are
+         * nothing: Frankfurter's open-ended date range is `/v1/2026-10-05..`.
          */
         fun address(request: Request): String? {
-            if (!PATH.matches(request.path) || request.path.contains("..")) return null
+            if (!PATH.matches(request.path) || request.path.split('/').any { it == "." || it == ".." }) return null
             val query = request.query.joinToString("&") { (name, value) -> encode(name) + "=" + encode(value) }
             return "https://" + request.host.domain + request.path + if (query.isEmpty()) "" else "?$query"
         }

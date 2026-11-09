@@ -56,6 +56,22 @@ class HttpTest {
         }
     }
 
+    @Test fun onlyASegmentThatIsExactlyOneOrTwoDotsIsRefused() {
+        for (path in listOf("/.", "/..", "/a/./b", "/a/../b", "/a/..", "/./a")) assertNull(path, HttpTransport.address(Request(Host.FRANKFURTER, path)))
+        // Exchange rates' open-ended date range ends in two dots: a segment like any other.
+        assertEquals("https://api.frankfurter.dev/v1/2026-10-05..?base=EUR",
+            HttpTransport.address(Request(Host.FRANKFURTER, "/v1/2026-10-05..", listOf("base" to "EUR"))))
+        for (path in listOf("/v1/a..b", "/v1/..a", "/v1/...", "/a.b/c")) assertEquals("https://airlabs.co$path", HttpTransport.address(Request(Host.AIRLABS, path)))
+    }
+
+    @Test fun whatTheTransportWouldRefuseFailsInTheFakeTooAndInTheSameWay() {
+        val refused = Request(Host.AIRLABS, "/a/../b")
+        fake.reply(Host.AIRLABS, "/a/../b", "{}")
+        val reply = fake.get(refused)
+        assertTrue(reply is Reply.Failed && reply.why == Why.UNREADABLE)
+        assertTrue(HttpTransport().get(refused).let { it is Reply.Failed && it.why == Why.UNREADABLE })
+    }
+
     @Test fun nothingGoesOutUnlessTheAppAllowsIt() {
         Http.allowed = { false }
         val reply = Http.get(forecast)

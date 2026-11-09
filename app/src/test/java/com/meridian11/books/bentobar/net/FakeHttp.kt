@@ -24,9 +24,14 @@ class FakeHttp : Transport {
 
     private fun answer(host: Host, path: String, reply: Reply) { replies.getOrPut(host.domain + path) { ArrayDeque() }.addLast(reply) }
 
-    /** A request nobody prepared an answer for is "not found", as from a service that doesn't know the path. */
+    /**
+     * A request nobody prepared an answer for is "not found", as from a service that doesn't know the path. One the
+     * real transport would refuse fails here for the same reason ([HttpTransport.address], the same code), so that a
+     * test can't pass on a request that could never leave the device.
+     */
     override fun get(request: Request): Reply {
         asked += request
+        if (HttpTransport.address(request) == null) return Reply.Failed(Why.UNREADABLE)
         val queue = replies[request.host.domain + request.path] ?: return Reply.Failed(Why.STATUS, 404)
         return if (queue.size > 1) queue.removeFirst() else queue.first()
     }
