@@ -3,8 +3,13 @@ package com.meridian11.books.bentobar.compose
 import android.app.Application
 import android.graphics.Rect
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.semantics.SemanticsActions
@@ -216,9 +221,42 @@ class StripTest {
 
     @Test fun inARightToLeftLanguageTheStripKeepsItsOrderAndASliderStillGoesItsReadingWay() {
         val second = entry("b", ItemState(icon = "X", text = "Beta", desc = "Beta desc"))
-        strip(listOf(plain, second), direction = LayoutDirection.Rtl)
+        strip(listOf(plain, second, sliderEntry), direction = LayoutDirection.Rtl)
         val a = rule.onNodeWithContentDescription("Alpha desc").getBoundsInRoot()
         val b = rule.onNodeWithContentDescription("Beta desc").getBoundsInRoot()
         assertFalse("the first item stays on the left: $a, $b", b.left < a.left)
+        // Inside the item the real direction holds: the slider's zone is on the item's left, its track's low end on the right.
+        val slider = rule.onNodeWithContentDescription("Volume")
+        slider.performTouchInput { click(Offset(62.dp.toPx(), centerY)) }
+        rule.runOnIdle { assertTrue("low at the right: ${events.slides}", events.slides.single().second < 0.3f) }
+        events.slides.clear()
+        slider.performTouchInput { click(Offset(8.dp.toPx(), centerY)) }
+        rule.runOnIdle { assertTrue("high at the left: ${events.slides}", events.slides.single().second > 0.7f) }
+        rule.runOnIdle { assertTrue("the slider had the presses: ${events.clicks}", events.clicks.isEmpty()) }
+    }
+
+    @Test fun inARightToLeftLanguageAnItemSlidesFromWhereItWasAndNotFromTheFarSide() {
+        val second = entry("b", ItemState(icon = "X", text = "Beta", desc = "Beta desc"))
+        var order by mutableStateOf(listOf(plain, second))
+        rule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                Strip(order, emptyList(), showChevron = false, chevronAlways = false, chevronReservePx = 30, expanded = false, chevronOnLeft = true,
+                    look = look, maxWidthPx = 2000, heightDp = 36.dp, events = events, onOverflow = {})
+            }
+        }
+        rule.waitForIdle()
+        val from = rule.onNodeWithContentDescription("Beta desc").getBoundsInRoot().left
+        val to = rule.onNodeWithContentDescription("Alpha desc").getBoundsInRoot().left
+        // Swapped: Beta goes left to where Alpha stood, frame by frame. It must never be drawn left of where it is going.
+        rule.mainClock.autoAdvance = false
+        rule.runOnUiThread { order = listOf(second, plain) }
+        var moving = false
+        repeat(30) {
+            rule.mainClock.advanceTimeByFrame()
+            val left = rule.onNodeWithContentDescription("Beta desc").getBoundsInRoot().left
+            if (left > to + 1.dp && left < from - 1.dp) moving = true
+            assertTrue("drawn at $left, between $to and $from", left >= to - 1.dp && left <= from + 1.dp)
+        }
+        assertTrue("it slid between the two places", moving)
     }
 }
