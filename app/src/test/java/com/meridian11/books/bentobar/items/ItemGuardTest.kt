@@ -55,12 +55,12 @@ class ItemGuardTest {
     }
 
     @Test fun aFailingSamplerDoesNotCostTheTimersTheirTick() {
-        val items = SourceScan.code(File("src/main/java/com/meridian11/books/bentobar/items/Items.kt"))
+        val items = SourceScan.code(File("src/main/java/com/meridian11/books/bentobar/items/TickLoop.kt"))
         assertFalse("samplers are guarded against any Throwable, not only Exception", "catch (e: Exception)" in items)
         // The clock checks in a guard of their own, after the samplers'.
         val once = items.substringAfter("private fun runOnce(").substringBefore("val next = HashMap(_states.value)")
-        val samplers = once.indexOf("Env.tick(")
-        val clocks = once.indexOf("Timers.check()")
+        val samplers = once.indexOf("wiring.sampleEnv(")
+        val clocks = once.indexOf("wiring.clocks()")
         assertTrue(once.substring(samplers, clocks), samplers in 0 until clocks && "ItemGuard.run(" in once.substring(samplers, clocks))
     }
 }
