@@ -258,6 +258,8 @@ class BarController(private val service: AccessibilityService) {
         runCatching { WallpaperManager.getInstance(service).removeOnColorsChangedListener(wallpaper) }
         closeMenu(now = true)
         hideTip()
+        // Nothing is revealed once this controller is gone: the ticker outlives it, in the process.
+        Ticker.revealHidden = false
         main.removeCallbacksAndMessages(null) // after closeMenu, which posts a collapse
         strip.destroy()
         if (screenLock.isHeld) screenLock.release()
@@ -378,6 +380,9 @@ class BarController(private val service: AccessibilityService) {
             closeMenu(now = true)
             hideTip()
             cancelDrag() // the strip's window goes, and with it the release that would end a drag
+            // and the Exit that would end a hover: what only the pointer held out doesn't come back with the bar.
+            hovering = false; main.removeCallbacks(expandOnHover)
+            if (!pinned && expanded.value) expanded.value = false
             strip.hide()
             // Readings still to come were for a strip that is gone: its return asks again.
             watch.clear(); main.removeCallbacks(sample)
