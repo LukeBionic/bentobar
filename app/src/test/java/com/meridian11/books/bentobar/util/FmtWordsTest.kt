@@ -19,6 +19,24 @@ class FmtWordsTest {
         assertTrue("the compact form is still the bar's", Fmt.duration(12 * 60_000L) == "12m")
     }
 
+    @Test fun aMeetingOrACountdownIsSaidToTheMinuteAndInSecondsOnlyWhenNothingLargerIsLeft() {
+        // What the bar writes, said aloud; and the words stay the same for a whole minute, so the item isn't drawn again for them.
+        assertEquals("12 minutes", Fmt.spokenMinutes(12 * 60_000L + 35_000))
+        assertEquals("1 minute", Fmt.spokenMinutes(60_000L + 59_000))
+        assertEquals("1 hour 5 minutes", Fmt.spokenMinutes(65 * 60_000L + 20_000))
+        assertEquals("3 days 4 hours", Fmt.spokenMinutes((3 * 86_400L + 4 * 3600 + 120) * 1000))
+        assertEquals("45 seconds", Fmt.spokenMinutes(45_000L))
+        assertEquals("0 seconds", Fmt.spokenMinutes(0L))
+    }
+
+    @Test fun aTimersTimeLeftIsRoundedUpAsItsFaceIs() {
+        assertEquals("4:05", Fmt.clock(244_100L))
+        assertEquals("4 minutes 5 seconds", Fmt.spokenLeft(244_100L))
+        assertEquals("0:01", Fmt.clock(400L))
+        assertEquals("1 second", Fmt.spokenLeft(400L))
+        assertEquals("0 seconds", Fmt.spokenLeft(0L))
+    }
+
     @Test fun whatIsSaidNamesAtMostTwoUnits() {
         // Hours and minutes, and the seconds left out; days and hours, with the minutes left out.
         assertEquals("2 hours 30 minutes", Fmt.spoken((2 * 3600 + 30 * 60 + 45) * 1000L))

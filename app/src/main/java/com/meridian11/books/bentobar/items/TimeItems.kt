@@ -315,13 +315,13 @@ object EventItem : ItemType("event", R.string.item_event_title, Sym.GROUPS, R.st
         Calendar.current(now)?.let { e ->
             val left = Fmt.duration(e.end - now)
             return ItemState(icon = Sym.GROUPS, text = Env.str(R.string.event_now_text, TextRules.short(e.title, max), left), label = e.title, active = true,
-                tone = Tone.ACCENT, desc = Env.str(R.string.event_now_desc, e.title, Fmt.spoken(e.end - now)))
+                tone = Tone.ACCENT, desc = Env.str(R.string.event_now_desc, e.title, Fmt.spokenMinutes(e.end - now)))
         }
         val next = Calendar.next(now) ?: return ItemState(icon = Sym.GROUPS, desc = Env.str(R.string.event_no_more))
         val until = next.begin - now
         val near = until <= before.of(item) * 60_000L
         val whenText = if (until < 60 * 60_000L) Env.str(R.string.event_in, Fmt.duration(until.coerceAtLeast(60_000))) else shortTime(next.begin)
-        val whenSaid = if (until < 60 * 60_000L) Env.str(R.string.event_in, Fmt.spoken(until.coerceAtLeast(60_000))) else whenText
+        val whenSaid = if (until < 60 * 60_000L) Env.str(R.string.event_in, Fmt.spokenMinutes(until.coerceAtLeast(60_000))) else whenText
         return ItemState(icon = Sym.GROUPS, text = Env.str(R.string.event_next_text, TextRules.short(next.title, max), whenText), label = next.title, active = near,
             tone = if (near) Tone.ACCENT else Tone.NORMAL, desc = Env.str(R.string.event_next_desc, next.title, whenSaid))
     }
@@ -395,7 +395,7 @@ object TimerItem : ItemType("timer", R.string.item_timer_title, Sym.TIMER, R.str
                 ItemState(icon = if (!s.running) Sym.PAUSE else if (onBreak) Sym.COFFEE else Sym.TIMER, filled = true,
                     text = Fmt.clock(left), active = true, tone = if (left < 60_000 && s.running) Tone.ACCENT else Tone.NORMAL,
                     widthKey = "countdown",
-                    desc = Env.str(if (onBreak) R.string.timer_break_left_desc else R.string.timer_left_desc, Fmt.spoken(left)))
+                    desc = Env.str(if (onBreak) R.string.timer_break_left_desc else R.string.timer_left_desc, Fmt.spokenLeft(left)))
             }
         }
     }
@@ -520,7 +520,7 @@ object CountdownItem : ItemType("countdown", R.string.item_countdown_title, Sym.
         val name = label.of(item)
         val text = if (left <= 0) "${name.ifBlank { Env.str(R.string.countdown_now) }} ✓" else (if (name.isBlank()) "" else "$name ") + Fmt.duration(left)
         return ItemState(icon = Sym.HOURGLASS_TOP, text = text.trim(), active = left in 0..86_400_000L,
-            desc = Env.str(R.string.countdown_desc, name.ifBlank { Env.str(R.string.item_countdown_title) }, Fmt.spoken(left.coerceAtLeast(0))))
+            desc = Env.str(R.string.countdown_desc, name.ifBlank { Env.str(R.string.item_countdown_title) }, Fmt.spokenMinutes(left.coerceAtLeast(0))))
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host ->

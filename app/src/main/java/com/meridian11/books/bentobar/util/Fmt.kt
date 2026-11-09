@@ -89,6 +89,15 @@ object Fmt {
     }
 
     /**
+     * [spoken] to the minute: what the bar writes for a meeting or a countdown, said aloud. Seconds only when nothing larger is left,
+     * since the bar has none above a minute, and the same words for a whole minute, so the item isn't drawn again for them.
+     */
+    fun spokenMinutes(ms: Long): String = spoken(if (ms >= 60_000) ms - ms % 60_000 else ms)
+
+    /** [spoken] for a timer's time left, rounded up as [clock] rounds its face, so the two never differ and "0 seconds" means it is over. */
+    fun spokenLeft(ms: Long): String = spoken(ms + 999)
+
+    /**
      * Timer faces: "4:05", "12:30", "1:02:03". Time left rounds up (it reads 0:00 only when it's
      * over); time taken, [elapsed] (the stopwatch), rounds down, so it reads 0:01 after a second.
      */
