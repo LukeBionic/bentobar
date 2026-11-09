@@ -151,7 +151,7 @@ class StripContentTest {
 
         // The words: laid out where the rule says, and drawn unless they are nothing but spaces, which keep their place.
         assertTrue(rule, "parts.textDrawn" in rule)
-        assertTrue(view, "val showText = parts.text" in view)
+        assertTrue(view, Regex("""val showText = parts\.text\b""").containsMatchIn(view))
         assertEquals(1, Regex("""\bText\(""").findAll(view).count())
         assertTrue(view, "Text(s.text!!" in view.substringAfter("if (showText) {", ""))
         val spaces = StripContent.parts(ItemState(icon = "", text = "   "), Display.TEXT)
