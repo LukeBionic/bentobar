@@ -104,8 +104,9 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     address. `Http.get` refuses unless the service is switched on, an item that uses it is outside
     Off and something that shows items is on screen, and never runs on the main thread. A query can
     hold a key: a `Request` prints as host and path only, and no exception leaves `HttpTransport`.
-  - `data/LayoutIntents.kt`: what a command does to an item's place (`show`, `hide`, `turnOff`, `putIn`, `setWhenActive`), as pure
-    steps from one layout to the next. A screen calls `Store.update { it.hide(id) }` and writes no section or rule of its own
+  - `data/LayoutIntents.kt`: what a command does to an item (`show`, `hide`, `turnOff`, `putIn`, `setWhenActive`), as pure
+    steps from one layout to the next: it changes the section and never the place in the list, which only a Move, drag or drop
+    does (`moved`). A screen calls `Store.update { it.hide(id) }` and writes no section or rule of its own
     (`LayoutIntentsTest` holds them to it). `stripPlan` (in `Model.kt`) is the one choice of what the strip and the settings
     preview show (`StripPlanTest`).
   - `data/`: `Model.kt` (`BarConfig`, `ItemConfig`, `Section`…) and `Store` (JSON in

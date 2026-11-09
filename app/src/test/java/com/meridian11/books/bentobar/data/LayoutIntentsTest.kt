@@ -16,24 +16,35 @@ class LayoutIntentsTest {
     private fun BarConfig.ids() = items.map { it.id }
     private fun BarConfig.at(id: String) = items.single { it.id == id }
 
-    @Test fun hidingPutsAnItemAtTheEndOfHidden() {
-        val c = layout.hide("s")
-        assertEquals(Section.HIDDEN, c.at("s").section)
-        assertEquals(listOf("s2", "h", "s", "o"), c.ids())
-    }
-
-    @Test fun showingAndTurningOffPutAnItemAtTheEndOfTheirSections() {
+    @Test fun aCommandChangesAnItemsSectionNeverItsPlaceInTheList() {
+        val hid = layout.hide("s")
+        assertEquals(Section.HIDDEN, hid.at("s").section)
+        assertEquals(layout.ids(), hid.ids())
         val back = layout.show("h")
         assertEquals(Section.SHOWN, back.at("h").section)
-        assertEquals(listOf("s", "s2", "h", "o"), back.ids())
+        assertEquals(layout.ids(), back.ids())
         val gone = layout.turnOff("s2")
         assertEquals(Section.OFF, gone.at("s2").section)
-        assertEquals(listOf("s", "h", "o", "s2"), gone.ids())
+        assertEquals(layout.ids(), gone.ids())
+        val chosen = layout.putIn("o", Section.SHOWN)
+        assertEquals(Section.SHOWN, chosen.at("o").section)
+        assertEquals(layout.ids(), chosen.ids())
     }
 
-    @Test fun anEmptySectionTakesTheItemAtTheEndOfTheList() {
-        val c = BarConfig(items = listOf(shown, off)).hide("s")
-        assertEquals(listOf("o", "s"), c.ids())
+    @Test fun inShowEverythingAHideThatHidesNothingMovesNothingAlongTheStrip() {
+        // The default mode draws Hidden items, so an item that jumped to the section's end would jump along the strip.
+        val c = BarConfig(items = listOf(shown, hidden.copy(section = Section.SHOWN), shown2))
+        assertEquals(HiddenMode.SHOW_ALL, c.hiddenMode)
+        val before = c.stripPlan({ false }, expanded = false, overflow = false).visible.map { it.id }
+        assertEquals(before, c.hide("h").stripPlan({ false }, expanded = false, overflow = false).visible.map { it.id })
+    }
+
+    @Test fun hideThenShowLeavesAnItemWhereItWas() {
+        assertEquals(layout.ids(), layout.hide("s").show("s").ids())
+    }
+
+    @Test fun onlyAnExplicitMoveChangesAnItemsPlace() {
+        assertEquals(listOf("s2", "s", "h", "o"), layout.copy(items = layout.items.moved("s", Section.HIDDEN, 0)).ids())
     }
 
     @Test fun aCommandForTheSectionAnItemIsAlreadyInMovesNothing() {
@@ -68,7 +79,7 @@ class LayoutIntentsTest {
         assertEquals(Section.SHOWN, stayed.at("s").section)
     }
 
-    @Test fun anItemsRuleStaysOnThroughACommandThatMovesIt() {
+    @Test fun anItemsRuleStaysOnThroughACommandThatChangesItsSection() {
         val rule = layout.setWhenActive("h", true)
         assertTrue(rule.turnOff("h").at("h").whenActive)
         assertTrue(rule.show("h").at("h").whenActive)
