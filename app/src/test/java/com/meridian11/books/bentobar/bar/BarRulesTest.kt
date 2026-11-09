@@ -12,8 +12,10 @@ import java.io.File
  * Whether the strip shows, hides or covers system icons, from window lists replayed through the rules that decide it.
  * The first group is one test per window-related finding in AGENTS.md's "Things learned the hard way", named after it.
  *
- * The lists are in the form of the `windows` debug hook. They are written out from what docs/research/device-findings.md
- * recorded on a 14-inch Googlebook (1920x1200, the bar 41 px tall), so the sizes and shapes are real and the ids are not.
+ * The lists are in the form of the `windows` debug hook. The states a real device was captured in (src/test/resources/windows:
+ * a floating, a maximized and a full-screen app, the bar hidden by one, a system panel, a screenshot preview) are those
+ * captures, on a 2560x1600 screen with a 54 px bar, titles replaced by the neutral ones. The rest are written out from what
+ * docs/research/device-findings.md recorded on a 14-inch Googlebook (1920x1200, the bar 41 px tall): real sizes, made-up ids.
  */
 class BarRulesTest {
     private val barBox = Box(0, 0, 1920, 41)
@@ -30,6 +32,13 @@ class BarRulesTest {
     private val shade = "50:t3:NotificationShade:[0,0][1920,1200]"
     private val preview = "60:t3:Screenshot preview:[0,0][1920,1200]"
 
+    /** What the device's bar read as in the captures: the bar's size, the free spacer, the clock. */
+    private val realBar = Box(0, 0, 2560, 54)
+    private val realReading = BarSnapshot(1, realBar, Box(242, 0, 2243, 54), Box(45, 14, 97, 40), "dateTimeChip ImeIndicator ContextualCursor notificationIcons system_icons")
+
+    /** A window list captured from a device, as `./bento debug windows` printed it. */
+    private fun capture(name: String) = checkNotNull(javaClass.getResource("/windows/$name.txt")) { "no capture $name" }.readText().trim()
+
     private fun list(vararg windows: String) = windows.joinToString(" | ")
 
     private fun look(
@@ -41,22 +50,27 @@ class BarRulesTest {
     }
 
     /** One look after another, what each remembers going to the next, the bar read the same throughout. */
-    private fun replay(vararg lists: String): List<BarDecision> {
+    private fun replay(vararg lists: String, read: BarSnapshot = reading): List<BarDecision> {
         var neighbours = BarNeighbours()
-        return lists.map { w -> look(w, neighbours = neighbours).also { neighbours = it.neighbours } }
+        return lists.map { w -> look(w, last = read, now = read, neighbours = neighbours).also { neighbours = it.neighbours } }
     }
+
+    /** [look] on the device's bar. */
+    private fun lookReal(windows: String, neighbours: BarNeighbours = BarNeighbours()) = look(windows, last = realReading, now = realReading, neighbours = neighbours)
 
     // ---- the findings ------------------------------------------------------------------------
 
     @Test fun theBarChangesItsLookWithoutTellingAnyone() {
         // Maximized by the caption's button: the bar turns solid in the same window, with no event of its own. Restored: back.
-        val reads = replay(list(bar, strip, floating), list(bar, strip, maximized), list(bar, strip, maximized), list(bar, strip, floating)).map { it.read }
-        assertEquals(listOf(null, BarRules.Read.WINDOWS_MOVED, null, BarRules.Read.WINDOWS_MOVED), reads)
+        val reads = replay(capture("floating"), capture("maximized"), capture("maximized"), capture("floating"), read = realReading).map { it.read }
+        // The first look reads too: on the real desktop the home screen is listed under the bar, and with nothing remembered that is a window
+        // under it. (The composed list had no home screen, and the first look read nothing.)
+        assertEquals(listOf(BarRules.Read.WINDOWS_MOVED, BarRules.Read.WINDOWS_MOVED, null, BarRules.Read.WINDOWS_MOVED), reads)
     }
 
     @Test fun theBarChangesItsLookWithoutTellingAnyone_aThirdLookIsTheWindowUnderTheBar() {
         // The keyboard's full-screen key: the same window, under the bar now, and no window against its edge.
-        val reads = replay(list(bar, strip, maximized), list(bar, strip, fullScreen), list(bar, strip, floating)).map { it.read }
+        val reads = replay(capture("maximized"), capture("fullscreen"), capture("floating"), read = realReading).map { it.read }
         assertEquals(listOf(BarRules.Read.WINDOWS_MOVED, BarRules.Read.WINDOWS_MOVED, BarRules.Read.WINDOWS_MOVED), reads)
     }
 
@@ -110,16 +124,17 @@ class BarRulesTest {
 
     @Test fun theStatusBarHidesAfterAnAppGoesFullscreen_theStripFollowsItsWindowAway() {
         // When an app hides the bar, the bar's window leaves the list; the overlay would otherwise stay on top of the app.
-        val d = WindowDump(list(strip, fullScreen))
-        assertNull(BarRules.findBar(d.listed, 1920, 45))
-        val gone = look(list(strip, fullScreen), now = null)
+        // Real: the bar and the strip both leave the list (the system's own bar is hidden, then the strip follows it).
+        val d = WindowDump(capture("fullscreen-hides-bar"))
+        assertNull(BarRules.findBar(d.listed, 2560, 60))
+        val gone = look(capture("fullscreen-hides-bar"), now = null)
         assertFalse(gone.show)
         assertEquals(BarStatus.NO_BAR, gone.status)
     }
 
     @Test fun playProtectsLiveThreatDetection_readingsOnlyOnAChangeAndOnlyWhileTheStripShows() {
         // Nothing moved, the strip showing: no screenshot of the bar.
-        assertNull(look(list(bar, strip, maximized), neighbours = replay(list(bar, strip, maximized)).last().neighbours).read)
+        assertNull(lookReal(capture("maximized"), neighbours = replay(capture("maximized"), read = realReading).last().neighbours).read)
         // Something moved, the strip not showing: none either. The strip's return asks again.
         assertNull(look(list(bar, strip, maximized), locked = true).read)
         assertNull(look(list(bar, strip, maximized), enabled = false).read)
@@ -138,7 +153,7 @@ class BarRulesTest {
     }
 
     @Test fun theDesktopPanelsOpenBelowTheBarAndDoNotHideIt() {
-        val d = look(list(bar, strip, "70:t3:QuickSettings:[1376,41][1826,266]", taskbar))
+        val d = lookReal(capture("quick-panel"))
         assertTrue(d.show)
         assertNull(d.status)
         assertNull(d.cover)
@@ -155,7 +170,39 @@ class BarRulesTest {
     }
 
     @Test fun anAppWindowOverTheBarDoesNotCountAsCover() {
-        assertNull(look(list(bar, fullScreen)).cover)
+        assertNull(lookReal(capture("fullscreen")).cover)
+        assertTrue(lookReal(capture("fullscreen")).show)
+    }
+
+    @Test fun aCaptionWindowIsNeitherACoverNorANeighbour() {
+        // The t7 window the system puts over an app's top edge: the floating app's caption sits at its top, the maximized app's just under the bar.
+        for (name in listOf("floating", "maximized")) {
+            val d = lookReal(capture(name))
+            assertTrue(name, d.show)
+            assertNull(name, d.cover)
+            assertNull(name, d.status)
+        }
+        // Taken out of the list, the same list is remembered the same: the caption adds nothing to what the bar looks like.
+        for (name in listOf("floating", "maximized")) {
+            val with = capture(name)
+            val without = with.split(" | ").filterNot { it.contains(":t7:") }.joinToString(" | ")
+            assertTrue("$name has a caption", without != with)
+            assertEquals(name, lookReal(without).neighbours, lookReal(with).neighbours)
+        }
+    }
+
+    @Test fun aCaptionOverTheBarsPlaceOfAFullScreenAppHidesNothing() {
+        // Full screen with the bar hidden: the caption's window is at the very top, in the bar's place, with no bar listed.
+        val windows = capture("fullscreen-hides-bar")
+        assertTrue("the capture holds a caption window over the top edge", windows.contains(":t7:Window:[0,0][2560,60]"))
+        val d = look(windows, now = null)
+        assertEquals(BarStatus.NO_BAR, d.status)
+        assertFalse(d.show)
+    }
+
+    @Test fun theSystemsConfirmationOfFullScreenIsNoCoverWithoutABar() {
+        // A big system window over the free area ([830,0][1730,364]), but there is no bar: the reason is the missing bar.
+        assertEquals(BarStatus.NO_BAR, look(capture("fullscreen-hides-bar"), now = null).status)
     }
 
     @Test fun theBarIsNoCoverOfItself() {
@@ -165,7 +212,7 @@ class BarRulesTest {
     }
 
     @Test fun theScreenshotPreviewIsBigButDoesNotCoverTheBar() {
-        assertTrue(look(list(bar, strip, preview)).show)
+        assertTrue(lookReal(capture("screenshot-preview")).show)
     }
 
     @Test fun aScreenshotPreviewOverAShadeHidesNothingOfTheShade() {
