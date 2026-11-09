@@ -95,6 +95,9 @@ class ManifestTest {
             assertTrue(section, s.all("exclude").any { it.getAttribute("domain") == "root" && it.getAttribute("path") == "no_backup" })
             // Nothing is named for inclusion, which would turn the rest of the rules into "only this".
             assertEquals(section, 0, s.all("include").size)
+            // A running timer and keep awake are this install's: restored elsewhere, a timer would ring on a device it was never set on.
+            val sharedPrefs = s.all("exclude").filter { it.getAttribute("domain") == "sharedpref" }.map { it.getAttribute("path") }.toSet()
+            assertEquals(section, setOf("timers.xml", "caffeine.xml"), sharedPrefs)
         }
     }
 

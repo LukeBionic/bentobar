@@ -199,7 +199,8 @@ send it no notifications: it receives none. Without it the item still shows that
 controls it. Nothing about what you play is stored or sent.
 
 If you use Android's backup, Android keeps a copy of BentoBar's settings in your Google account. Your
-AirLabs and Finnhub keys and the online switches are left out of it.
+AirLabs and Finnhub keys, the online switches, your answer to the accessibility explanation, a running timer and
+keep awake are left out of it.
 
 **Usage access is optional and off by default.** If you turn it on (Setup, or the Network and
 Storage menus), BentoBar reads how much data and storage each app uses, to list the top five in

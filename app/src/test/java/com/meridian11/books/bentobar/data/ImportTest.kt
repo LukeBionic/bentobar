@@ -81,6 +81,28 @@ class ImportTest {
         assertEquals(setOf("id", "type", "section", "whenActive", "display", "options"), item)
     }
 
+    @Test fun everyFieldOfALayoutIsEitherLocalOrCopied() {
+        // One list says what belongs to one install (LOCAL_SETTINGS). A new field is placed on one side here, or this fails:
+        // forgotten, it would ride Copy settings to another install.
+        val fields = (0 until BarConfig.serializer().descriptor.elementsCount).map { BarConfig.serializer().descriptor.getElementName(it) }.toSet()
+        assertEquals(setOf("enabled", "presenting", "pinnedOpen", "turnedOff", "onboarded"), LOCAL_SETTINGS)
+        val copied = setOf("version", "items", "position", "hiddenMode", "chevron", "revealOnHover", "autoCollapseSec", "textSize", "pill", "color",
+            "spacing", "hoverSwitchesPopups", "noAnimations", "systemTint", "chipMode", "cities")
+        assertEquals(fields, LOCAL_SETTINGS + copied)
+        assertEquals(emptySet<String>(), LOCAL_SETTINGS intersect copied)
+    }
+
+    @Test fun whatCopySettingsHandsOnHasNoInstallLocalSetting() {
+        val here = BarConfig(items = listOf(clock), position = Position.LEFT, enabled = false, presenting = true, pinnedOpen = true,
+            turnedOff = setOf(Uses.CALENDAR), onboarded = true)
+        val handed = here.withoutLocal()
+        assertEquals(BarConfig(items = listOf(clock), position = Position.LEFT), handed)
+        // And pasted somewhere else, the other install keeps its own.
+        val there = BarConfig(items = listOf(timer), enabled = true, turnedOff = setOf(Uses.NOTIFICATIONS), onboarded = true)
+        assertEquals(here.copy(enabled = true, presenting = false, pinnedOpen = false, turnedOff = setOf(Uses.NOTIFICATIONS), onboarded = true),
+            handed.keepingLocal(there))
+    }
+
     @Test fun anOlderLayoutIsMigrated() {
         val old = """{"version":2,"chevron":false,"items":[{"id":"m","type":"memory","section":"HIDDEN"}]}"""
         val c = Store.parseLayout(old)

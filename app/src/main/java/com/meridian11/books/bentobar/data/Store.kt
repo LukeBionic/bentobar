@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
+import java.io.File
 import java.util.UUID
 
 /**
@@ -30,24 +31,41 @@ object Store {
      * The user's answer to the accessibility disclosure. Google Play's User Data policy wants an app
      * that isn't an accessibility tool to say what it uses the AccessibilityService API for and get
      * consent, with a way to decline, before it sends anyone to turn its service on. Kept beside the
-     * layout, not in it: Copy settings must not carry consent to another install.
+     * layout, not in it, and in Android's no-backup directory like the online switches (data/Online.kt):
+     * Copy settings, a backup and a device transfer must not carry consent to another install.
      */
     enum class Consent { NOT_ASKED, DECLINED, AGREED }
 
-    private const val KEY_CONSENT = "accessibility_consent"
+    private const val KEY_CONSENT = "accessibility_consent" // where 1.7 kept it, in the backed-up prefs
+    private const val CONSENT_FILE = "consent"
+    private var consentFile: File? = null
     private val consentState = MutableStateFlow(Consent.NOT_ASKED)
     val consent: StateFlow<Consent> get() = consentState.asStateFlow()
 
     fun setConsent(answer: Consent) {
         consentState.value = answer
-        prefs.edit().putString(KEY_CONSENT, answer.name).apply()
+        consentFile?.let { runCatching { it.writeText(answer.name, Charsets.UTF_8) } }
+    }
+
+    /**
+     * The saved answer in [noBackupDir]. With none there, the answer an earlier version kept in the prefs ([legacy]) is
+     * moved over once; a restored backup that still holds one counts as that install's own answer.
+     */
+    internal fun loadConsent(noBackupDir: File, legacy: String?): Consent {
+        val file = File(noBackupDir, CONSENT_FILE).also { consentFile = it }
+        fun parse(name: String?) = name?.trim()?.let { runCatching { Consent.valueOf(it) }.getOrNull() }
+        parse(runCatching { file.takeIf { it.isFile }?.readText(Charsets.UTF_8) }.getOrNull())?.let { return it }
+        val moved = parse(legacy) ?: return Consent.NOT_ASKED
+        runCatching { file.writeText(moved.name, Charsets.UTF_8) }
+        return moved
     }
 
     @Synchronized
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("bentobar", Context.MODE_PRIVATE)
-        consentState.value = prefs.getString(KEY_CONSENT, null)?.let { runCatching { Consent.valueOf(it) }.getOrNull() } ?: Consent.NOT_ASKED
+        consentState.value = loadConsent(context.applicationContext.noBackupFilesDir, prefs.getString(KEY_CONSENT, null))
+        if (prefs.contains(KEY_CONSENT)) prefs.edit().remove(KEY_CONSENT).apply() // now in the no-backup file
         val raw = prefs.getString(KEY, null)
         val read = raw?.let(::decode)
         if (raw != null && read == null) {
@@ -122,7 +140,8 @@ object Store {
     /** A stored layout as this version reads it: a value it doesn't know is that field's default; null if it isn't a layout at all. */
     internal fun decode(raw: String): BarConfig? = runCatching { json.decodeFromString(BarConfig.serializer(), raw) }.getOrNull()
 
-    fun export(): String = json.encodeToString(BarConfig.serializer(), state.value)
+    /** The layout and look for Copy settings: what is local to this install stays out (see [LOCAL_SETTINGS]). */
+    fun export(): String = json.encodeToString(BarConfig.serializer(), state.value.withoutLocal())
 
     /**
      * Replaces the layout and the look with a pasted one. What belongs to this install stays as it

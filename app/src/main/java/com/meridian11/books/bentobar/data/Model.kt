@@ -1,6 +1,9 @@
 package com.meridian11.books.bentobar.data
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 /** Where an item lives: in the bar, hidden behind ‹, or off. */
 @Serializable
@@ -133,9 +136,26 @@ val BarConfig.spacingDp: Int get() = spacing.coerceIn(SPACING_DP)
 /** A spacer's width, within the slider's limits, for the same reason as [spacingDp]. */
 val ItemConfig.spacerWidthDp: Int get() = optInt("width", 12).coerceIn(SPACER_DP)
 
-/** This config with the settings that belong to one install taken from [local] (see [Store.import]). */
-fun BarConfig.keepingLocal(local: BarConfig): BarConfig = copy(enabled = local.enabled, turnedOff = local.turnedOff,
-    presenting = local.presenting, pinnedOpen = local.pinnedOpen, onboarded = local.onboarded)
+/**
+ * The settings that belong to one install and never travel: the master switch, presenting, hidden items pinned open, the
+ * permissions switched off in Setup and the first-run state. The one list: Copy settings leaves them out ([withoutLocal])
+ * and a pasted layout takes them from this install ([keepingLocal]), so a new per-install field is listed here or it
+ * travels (`ImportTest` fails until each field is placed on one side).
+ */
+val LOCAL_SETTINGS = setOf("enabled", "presenting", "pinnedOpen", "turnedOff", "onboarded")
+
+private val layoutJson = Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true }
+
+/** This config with the [LOCAL_SETTINGS] taken from [local] (see [Store.import]). */
+fun BarConfig.keepingLocal(local: BarConfig): BarConfig {
+    val mine = layoutJson.encodeToJsonElement(BarConfig.serializer(), this).jsonObject
+    val here = layoutJson.encodeToJsonElement(BarConfig.serializer(), local).jsonObject
+    val merged = JsonObject(mine.filterKeys { it !in LOCAL_SETTINGS } + here.filterKeys { it in LOCAL_SETTINGS })
+    return layoutJson.decodeFromJsonElement(BarConfig.serializer(), merged)
+}
+
+/** This config as a layout to hand on: with the [LOCAL_SETTINGS] at their defaults. */
+fun BarConfig.withoutLocal(): BarConfig = keepingLocal(BarConfig())
 
 /**
  * What BentoBar uses, as switched in Setup: a permission counts only if Android granted it and the
