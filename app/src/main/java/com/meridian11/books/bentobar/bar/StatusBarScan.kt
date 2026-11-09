@@ -9,9 +9,9 @@ internal fun Rect.box() = Box(left, top, right, bottom)
 internal fun Box.rect() = Rect(left, top, right, bottom)
 
 /**
- * Reads the accessibility tree into plain facts: the window list as [WindowFact]s, SystemUI's status bar window as
- * [BarNode]s, which [BarRules] turns into a [BarSnapshot]. The status bar is the only window BentoBar ever reads;
- * app windows are skipped.
+ * Reads the accessibility tree into plain facts for [BarRules]. The status bar is the only window whose content is
+ * read (SystemUI's status bar window, as [BarNode]s, which become a [BarSnapshot]); of any other window, only its kind,
+ * its id and where it is ([WindowFact]).
  */
 object StatusBarScan {
     /** What a scan brings back: the plain [snapshot], and the live spacer node (a cheap "did anything move?" check for [BarController]). */

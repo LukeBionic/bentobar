@@ -18,8 +18,14 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   - `bar/BarService.kt`: the AccessibilityService plus `BarController`. It scans the status bar,
     places the strip, hides it (fullscreen, keyguard, screen off, a shade covering the bar), runs
     menus, keep awake (a flag on the strip window) and colour sampling, and has adb `debug()` hooks.
-  - `bar/StatusBarScan.kt`: finds the status bar window (TYPE_SYSTEM at y=0) and the free area
-    (the `DesktopStatusBarSpacer` node on Googlebook OS, else the widest gap).
+  - `bar/StatusBarScan.kt`: the edge of the window reading: the window list as `WindowFact`s (kind, id, bounds) and
+    the status bar window's node tree as `BarNode`s, for `BarRules`.
+  - `bar/BarRules.kt`: what those facts mean, pure and unit-tested: which window is the status bar (TYPE_SYSTEM at
+    y=0), the free area (the `DesktopStatusBarSpacer` node on Googlebook OS, else the widest gap), and `decide`: whether the
+    strip shows, why not, what covers it, what to read. `BarController.check` collects the facts, asks, and does the
+    Android part in the order that matters; `BarRulesTest` replays window lists in the form of `./bento debug windows`,
+    one test per window finding below. `bar/PopupState.kt` is the same for a press, a click and a window's end: it
+    says what to do (`PopupCommand`), `MenuKey` names the popup, and the window's own phases stay in `MenuWindow`.
   - `bar/BarPixels.kt`: the status bar's text and background color from the pixels around its clock
     (pure, unit-tested); `bar/Contrast.kt` then holds every strip color to 4.5:1.
   - `bar/BarNeighbours.kt`: which app windows make the bar look different (one against its lower
@@ -98,7 +104,8 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     and drop across the section cards: the gesture sits on the container, a copy of the row floats
     above the cards, the Store changes once on the drop), `Pages` (Add, Look, Setup, About),
     `Disclosure` (the accessibility disclosure and consent Google Play requires, and the one list of
-    what the service does that Setup shows too), `Theme`, `MenuKit` and `Controls` (shared UI pieces).
+    what the service does that Setup shows too; `ConsentRules` says when it comes up), `Theme`, `MenuKit` and
+    `Controls` (shared UI pieces).
   - "Show when…": a type's `trigger` (in `ItemType.kt`) words its pop-out rule, and its `Threshold`
     is the one source of the option key and default for both `state()` and the settings slider.
   - `tile/Tiles.kt`: the BentoBar, Keep awake and Timer tiles.

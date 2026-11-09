@@ -14,7 +14,7 @@ internal object ConsentRules {
     /**
      * Whether the disclosure comes up by itself, at the first opening: no answer yet, the service not running and not
      * named in the system's setting (just after an update, Android restarts the activity before it binds the service
-     * again), and Advanced Protection not forbidding accessibility tools anyway.
+     * again), and Advanced Protection not on (it turns off accessibility services like this one anyway).
      */
     fun asksOnFirstOpening(consent: Store.Consent, serviceOn: () -> Boolean, settingOn: () -> Boolean, advancedProtection: () -> Boolean): Boolean =
         consent == Store.Consent.NOT_ASKED && !serviceOn() && !settingOn() && !advancedProtection()
