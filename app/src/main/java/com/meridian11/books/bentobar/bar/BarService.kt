@@ -15,7 +15,6 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
-import android.view.MotionEvent
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -26,7 +25,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import com.meridian11.books.bentobar.data.HiddenMode
 import com.meridian11.books.bentobar.data.shows
@@ -41,10 +39,7 @@ import com.meridian11.books.bentobar.items.Chips
 import com.meridian11.books.bentobar.items.DisplaysItem
 import com.meridian11.books.bentobar.items.Env
 import com.meridian11.books.bentobar.items.Items
-import com.meridian11.books.bentobar.items.MenuHost
 import com.meridian11.books.bentobar.items.Ticker
-import com.meridian11.books.bentobar.ui.MainActivity
-import com.meridian11.books.bentobar.ui.MenuRoom
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -124,7 +119,7 @@ class BarController(private val service: AccessibilityService) {
         var value: Boolean
             get() = state.value
             set(v) {
-                state.value = v; Ticker.revealHidden = v || menuKey == MenuKey.Bar; if (v) Ticker.refresh()
+                state.value = v; Ticker.revealHidden = v || menus.menuKey == MenuKey.Bar; if (v) Ticker.refresh()
                 // Out: a click anywhere else folds them away again (see [outsideClick]).
                 strip.watchOutside(v)
             }
@@ -148,15 +143,10 @@ class BarController(private val service: AccessibilityService) {
 
     /** A click outside the strip while hidden items are out folds them away, unless a menu is open (it closes itself). */
     private fun outsideClick() {
-        if (menuKey != null || !expanded.value) return
+        if (menus.menuKey != null || !expanded.value) return
         expanded.value = false; pinned = false
         if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
     }
-    /** Which popup is up, which is still folding away, and whose click a press has spent. */
-    private val popups = PopupState<MenuWindow>()
-    private val menu get() = popups.open
-    // Observable, so the strip's highlight can stay on the item whose popup is open (StripHost).
-    private var menuKey: MenuKey? by mutableStateOf(null)
     private var snap: BarSnapshot? = null
     private var overlayIds = emptySet<Int>()
     private var hovering = false
@@ -164,6 +154,13 @@ class BarController(private val service: AccessibilityService) {
     private var started = false
     /** Where each item was last drawn (window coordinates), for anchoring menus from tests. */
     val placed = HashMap<String, Rect>()
+
+    /** The popups and the tooltip. */
+    private val menus: MenuCoordinator = MenuCoordinator(service, main, wm, strip, placed, object : MenuCoordinator.Facts {
+        override val snapshot get() = snap
+        override val expanded get() = this@BarController.expanded.value
+        override fun popupClosed() { if (!hovering && !pinned) { main.removeCallbacks(collapse); main.postDelayed(collapse, 600) } }
+    })
 
     private val scanNow = Runnable { scan() }
     private val quickCheck = Runnable { check(full = false) }
@@ -201,7 +198,7 @@ class BarController(private val service: AccessibilityService) {
         override fun run() {
             // A slider held by a pointer that has wandered off the strip: its item stays where it is until it lets go.
             if (sliding) { main.postDelayed(this, 300); return }
-            if (!hovering && menuKey == null && expanded.value) {
+            if (!hovering && menus.menuKey == null && expanded.value) {
                 Log.i(tag, "collapse (pinned=$pinned autoCollapse=${Store.config.value.autoCollapseSec}s)")
                 expanded.value = false; pinned = false
                 if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
@@ -213,7 +210,7 @@ class BarController(private val service: AccessibilityService) {
 
     private val screen = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
-            if (i.action == Intent.ACTION_SCREEN_OFF) closeMenu(now = true)
+            if (i.action == Intent.ACTION_SCREEN_OFF) menus.closeMenu(now = true)
             awake.update()
             main.post(scanNow)
             if (i.action == Intent.ACTION_SCREEN_ON) {
@@ -245,8 +242,8 @@ class BarController(private val service: AccessibilityService) {
         BarOverflow.ids.value = emptySet()
         runCatching { service.unregisterReceiver(screen) }
         colors.stop()
-        closeMenu(now = true)
-        hideTip()
+        menus.closeMenu(now = true)
+        menus.hideTip()
         // Nothing is revealed once this controller is gone: the ticker outlives it, in the process.
         Ticker.revealHidden = false
         main.removeCallbacksAndMessages(null) // after closeMenu, which posts a collapse
@@ -278,7 +275,7 @@ class BarController(private val service: AccessibilityService) {
 
     /** Rotation, density or resolution: a menu or tooltip placed for the old display would be off, so close them. */
     fun onConfigChanged() {
-        closeMenu(now = true); hideTip()
+        menus.closeMenu(now = true); menus.hideTip()
         main.postDelayed(scanNow, 200); colors.readSoon(ColorWatch.Cause.SLOW, 500)
     }
 
@@ -351,8 +348,8 @@ class BarController(private val service: AccessibilityService) {
         } else {
             if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${d.cover?.box?.toShortString()} " +
                 "enabled=${cfg.enabled} interactive=$interactive locked=$locked)")
-            closeMenu(now = true)
-            hideTip()
+            menus.closeMenu(now = true)
+            menus.hideTip()
             cancelDrag() // the strip's window goes, and with it the release that would end a drag
             // and the Exit that would end a hover: what only the pointer held out doesn't come back with the bar.
             hovering = false; main.removeCallbacks(expandOnHover)
@@ -450,7 +447,7 @@ class BarController(private val service: AccessibilityService) {
                 events = events,
                 onOverflow = { ids -> main.post { if (BarOverflow.ids.value != ids) { BarOverflow.ids.value = ids; main.post(scanNow) } } },
                 // The item a popup belongs to: an item's popup and its right-click menu are the item's, the ‹ menu is ‹'s.
-                open = menuKey?.owner?.ifEmpty { null },
+                open = menus.menuKey?.owner?.ifEmpty { null },
             )
         }
     }
@@ -493,19 +490,19 @@ class BarController(private val service: AccessibilityService) {
         override fun click(item: ItemConfig, at: Rect) {
             placed[item.id] = at
             // A click ends the hover's tooltip, whatever it does next (a screenshot must not catch it).
-            hideTip()
+            menus.hideTip()
             val type = Items.of(item.type) ?: return
             if (type.onClick(item)) { Ticker.refresh(); return }
             if (type.menu == null) return
-            toggleMenu(MenuKey.Item(item.id), at, type.menuWidthDp) { host -> ItemMenu(item.id, host) }
+            menus.toggleMenu(MenuKey.Item(item.id), at, type.menuWidthDp) { host -> ItemMenu(item.id, host) }
         }
 
         override fun context(item: ItemConfig, at: Rect) {
             placed[item.id] = at
-            toggleMenu(MenuKey.ItemContext(item.id), at, 280) { host ->
+            menus.toggleMenu(MenuKey.ItemContext(item.id), at, 280) { host ->
                 ItemContextMenu(item.id, host) {
                     val type = Items.of(item.type)
-                    if (type?.menu != null) { closeMenu(dissolve = true); toggleMenu(MenuKey.Item(item.id), at, type.menuWidthDp) { h -> ItemMenu(item.id, h) } }
+                    if (type?.menu != null) { menus.closeMenu(dissolve = true); menus.toggleMenu(MenuKey.Item(item.id), at, type.menuWidthDp) { h -> ItemMenu(item.id, h) } }
                 }
             }
         }
@@ -518,7 +515,7 @@ class BarController(private val service: AccessibilityService) {
         /** The slider in the bar: the item sets what it stands for, and only that item is drawn again (no sampler runs for a drag). */
         override fun slide(item: ItemConfig, level: Float, done: Boolean) {
             sliding = !done
-            hideTip()
+            menus.hideTip()
             Items.of(item.type)?.onSlide(item, level, done)
             Ticker.refresh(item)
         }
@@ -536,7 +533,7 @@ class BarController(private val service: AccessibilityService) {
             if (next && secs > 0) main.postDelayed(collapse, secs * 1000L)
         }
 
-        override fun chevronContext(at: Rect) = barMenu(at, everything = false)
+        override fun chevronContext(at: Rect) = menus.barMenu(at, everything = false)
 
         /**
          * A drag in the bar. While it moves, the strip previews the new order ([dragPreview]), so
@@ -546,7 +543,7 @@ class BarController(private val service: AccessibilityService) {
          * ones out on their own or revealed from ‹ keep their section.
          */
         override fun drag(item: ItemConfig, dx: Float, done: Boolean) {
-            hideTip()
+            menus.hideTip()
             if (dragFrom?.first != item.id) {
                 val r = placed[item.id]
                 dragFrom = r?.let { item.id to Rect(it) }
@@ -583,18 +580,7 @@ class BarController(private val service: AccessibilityService) {
             if (up != expanded.value) { expanded.value = up; pinned = false }
         }
 
-        override fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {
-            main.removeCallbacks(showTip)
-            // "Switch popups on hover": with a popup open, the item pointed at opens its own, as in a menu bar.
-            val type = Items.of(item.type)
-            if (inside && !sliding && type != null &&
-                PopupRules.hoverOpens(menuKey, item.id, hasPopup = type.menu != null, on = Store.config.value.hoverSwitchesPopups)) {
-                placed[item.id] = at
-                toggleMenu(MenuKey.Item(item.id), at, type.menuWidthDp) { host -> ItemMenu(item.id, host) }
-                return
-            }
-            if (inside && menu == null && !sliding) { tipFor = item to Rect(at); main.postDelayed(showTip, 600) } else hideTip()
-        }
+        override fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) = menus.itemHover(item, at, inside, sliding)
 
         override fun hover(inside: Boolean) {
             trace("hover $inside")
@@ -610,17 +596,6 @@ class BarController(private val service: AccessibilityService) {
         }
     }
 
-    private fun barMenu(at: Rect, everything: Boolean) = toggleMenu(MenuKey.Bar, at, 290) { host ->
-        BentoBarMenu(host, openItem = { item ->
-            val type = Items.of(item.type)
-            closeMenu(dissolve = true)
-            // From the list of every item, an item's menu opens under the item itself.
-            val anchor = placed[item.id]?.takeIf { everything } ?: at
-            if (type != null && type.onClick(item)) Ticker.refresh()
-            else if (type?.menu != null) toggleMenu(MenuKey.Item(item.id), anchor, type.menuWidthDp) { h -> ItemMenu(item.id, h) }
-        }, hideBar = { Store.update { it.copy(enabled = false) } }, everything = everything)
-    }
-
     /**
      * The "BentoBar menu" entry (a keyboard shortcut the user binds in the system's shortcut
      * settings): BentoBar's menu listing every item, focused for arrows and Enter. Again closes it.
@@ -632,147 +607,8 @@ class BarController(private val service: AccessibilityService) {
         val w = strip.params.width
         val h = strip.params.height
         val at = if (Store.config.value.position == Position.LEFT) Rect(0, 0, 1, h) else Rect(w - 1, 0, w, h)
-        barMenu(at, everything = true)
+        menus.barMenu(at, everything = true)
         return true
-    }
-
-    // ---- menus -------------------------------------------------------------------------------
-
-    private val host = object : MenuHost {
-        override fun close() = closeMenu()
-        override fun openItemSettings(id: String) { closeMenu(); MainActivity.open(service, id.ifEmpty { null }) }
-        // Once the popup is gone from the screen (a screenshot must not show it): a frame after its window is removed.
-        override fun afterClose(action: () -> Unit) { closeMenu(then = { main.postDelayed(action, 50) }) }
-    }
-
-    /**
-     * Opens the popup [key] below [anchor] (strip window coordinates), or closes it if it's open. A popup
-     * open for another item dissolves while this one unfolds; one still folding away turns round.
-     */
-    fun toggleMenu(key: MenuKey, anchor: Rect, widthDp: Int, content: @Composable (MenuHost) -> Unit) {
-        val now = SystemClock.uptimeMillis()
-        hideTip()
-        when (val step = popups.toggle(key, now)) {
-            PopupCommand.Fold -> { closeMenu(); return }
-            PopupCommand.Spend -> return
-            is PopupCommand.Reopen -> if (step.popup.reopen()) {
-                popups.reopened(step.popup, key)
-                menuKey = key
-                focusMenu(key)
-                return
-            }
-            PopupCommand.Open, PopupCommand.Dissolve -> Unit
-        }
-        closeMenu(dissolve = true) // resets the sampling demand, so the new popup's is set after it
-        val s = snap ?: return
-        // Before the popup's first frame reads anything (an item's own LaunchedEffect would run after it).
-        (key as? MenuKey.Item)?.id?.let { id ->
-            Store.config.value.items.firstOrNull { it.id == id }?.let { Items.of(it.type)?.menuOpening(it) }
-        }
-        val loc = strip.locationOnScreen()
-        val a = Rect(anchor).apply { offset(loc[0], loc[1]) }
-        val bounds = wm.currentWindowMetrics.bounds
-        val w = (widthDp * density).toInt()
-        val side = (MenuRoom.side.value * density).toInt()
-        // Under an item in the right half the card's right edge lines up with the item's, in the left half its left edge.
-        val left = if (a.centerX() > bounds.width() / 2) a.right - w else a.left
-        val x = left.coerceIn(side, (bounds.width() - w - side).coerceAtLeast(side))
-        val y = s.bar.bottom + (MenuRoom.top.value * density).toInt()
-        val maxH = ((bounds.height() - s.bar.bottom) / density - 170).toInt().coerceAtLeast(200)
-        val o = MenuWindow(service, "BentoBar menu", onOutside = { outside(it) }, onEscape = { closeMenu() })
-        if (!o.show(x, y, w, shadow = { MenuShadow(widthDp.dp, o.glass) }) { MenuSurface(widthDp.dp, maxH.dp, o.glass) { content(host) } }) return
-        popups.opened(o, key)
-        menuKey = key
-        focusMenu(key)
-    }
-
-    /**
-     * A press outside the open popup. On the popup's own item it folds the popup away and that press's click is
-     * spent; on another item the popup dissolves, and the click opens that item's popup as it unfolds; anywhere
-     * else it folds. (A press on another app's window comes without coordinates: it is "anywhere else".)
-     */
-    private fun outside(ev: MotionEvent) {
-        if (menuKey == null) return
-        val loc = strip.locationOnScreen()
-        val x = ev.rawX - loc[0]
-        val y = ev.rawY - loc[1]
-        val onStrip = (ev.rawX != 0f || ev.rawY != 0f) && strip.shown &&
-            x >= 0 && x < strip.params.width && y >= 0 && y < (snap?.bar?.height() ?: 0)
-        // The same rule as the highlight's: a press in a gap belongs to the item on its side of the gap's middle.
-        val hit = if (onStrip) PopupRules.pressedItem(x, placed.map { (k, r) -> Span(k, r.left.toFloat(), r.right.toFloat()) }) else null
-        when (popups.press(hit, SystemClock.uptimeMillis())) {
-            PopupCommand.Fold -> closeMenu()
-            PopupCommand.Dissolve -> closeMenu(dissolve = true)
-            else -> Unit
-        }
-    }
-
-    private fun focusMenu(key: MenuKey) {
-        Ticker.focusItem = (key as? MenuKey.Item)?.id
-        Ticker.revealHidden = expanded.value || key == MenuKey.Bar
-        Ticker.start("menu")
-    }
-
-    // ---- tooltips ----------------------------------------------------------------------------
-
-    private var tip: Overlay? = null
-    private var tipFor: Pair<ItemConfig, Rect>? = null
-    private val showTip = Runnable { tipFor?.let { (item, at) -> showTooltip(item, at) } }
-
-    /**
-     * The item's name below it, after a short hover: icon-only items otherwise give a mouse user
-     * nothing to go on. An item whose state has a tooltip of its own (a track's whole title and
-     * artist, which flight this is) shows that instead. A no-touch window, so it never takes a click.
-     */
-    private fun showTooltip(item: ItemConfig, anchor: Rect) {
-        hideTip()
-        val s = snap ?: return
-        if (menu != null || !strip.shown) return
-        val label = Ticker.states.value[item.id]?.tooltip?.takeIf { it.isNotBlank() } ?: Items.of(item.type)?.title ?: return
-        val loc = strip.locationOnScreen()
-        val a = Rect(anchor).apply { offset(loc[0], loc[1]) }
-        val paint = android.text.TextPaint().apply { textSize = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 13f, service.resources.displayMetrics) }
-        // A long tip ends in an ellipsis: the window is never wider than this.
-        val w = ((paint.measureText(label) + 2 * 10 * density).toInt() + 2).coerceAtMost((TOOLTIP_MAX_DP * density).toInt())
-        val bounds = wm.currentWindowMetrics.bounds
-        val o = Overlay(service, "BentoBar tooltip", touchable = false)
-        o.params.gravity = Gravity.TOP or Gravity.LEFT
-        o.params.width = w // exact, as for menus
-        o.params.height = (28 * density).toInt()
-        o.params.x = (a.centerX() - w / 2).coerceIn(0, (bounds.width() - w).coerceAtLeast(0))
-        o.params.y = s.bar.bottom + (4 * density).toInt()
-        tip = o
-        o.show { Tooltip(label) }
-    }
-
-    private fun hideTip() {
-        main.removeCallbacks(showTip)
-        tip?.destroy(); tip = null
-    }
-
-    /**
-     * Closes the open popup: it folds back into its item ([dissolve]: it dissolves in place, left for
-     * another), or goes at once ([now]: the service stopping, the screen going off, the display
-     * changing). [then] runs once it is off the screen.
-     */
-    fun closeMenu(now: Boolean = false, dissolve: Boolean = false, then: (() -> Unit)? = null) {
-        val o = menu
-        if (o == null) {
-            if (now) popups.dropLeaving()?.close(now = true)
-            then?.invoke()
-            return
-        }
-        // An earlier one still leaving goes at once: only one popup is ever folding away.
-        popups.leave(then = then != null)?.close(now = true)
-        menuKey = null
-        o.close(dissolve = dissolve, now = now) {
-            popups.gone(o)
-            then?.invoke()
-        }
-        Ticker.focusItem = null
-        Ticker.revealHidden = expanded.value
-        Ticker.stop("menu")
-        if (!hovering && !pinned) { main.removeCallbacks(collapse); main.postDelayed(collapse, 600) }
     }
 
     // ---- tests (adb only) --------------------------------------------------------------------
@@ -780,7 +616,7 @@ class BarController(private val service: AccessibilityService) {
     fun debug(cmd: List<String>): String {
         fun first(type: String) = Store.config.value.items.firstOrNull { it.type == type || it.id == type }
         return when (cmd.firstOrNull()) {
-            "dump" -> "snap=$snap look=${look.value} expanded=${expanded.value} menu=$menuKey shown=${strip.shown} placed=$placed"
+            "dump" -> "snap=$snap look=${look.value} expanded=${expanded.value} menu=${menus.menuKey} shown=${strip.shown} placed=$placed"
             "open", "ctx" -> {
                 val item = first(cmd.getOrElse(1) { "" }) ?: return "no such item"
                 val at = placed[item.id] ?: return "item not drawn yet"
@@ -793,7 +629,7 @@ class BarController(private val service: AccessibilityService) {
             }
             "barmenu" -> { events.chevronContext(placed["chevron"] ?: Rect(0, 0, 40, 40)); "ok" }
             "hover" -> { events.hover(cmd.getOrNull(1) == "on"); "ok" }
-            "close" -> { closeMenu(); "ok" }
+            "close" -> { menus.closeMenu(); "ok" }
             "solid" -> { MenuWindow.solid = cmd.getOrNull(1) != "off"; "solid=${MenuWindow.solid}" }
             "scan" -> { scan(); "snap=$snap" }
             "sample" -> { colors.sampleNow(); "sampling" }
@@ -803,7 +639,6 @@ class BarController(private val service: AccessibilityService) {
     }
 
     companion object {
-        private const val TOOLTIP_MAX_DP = 360
         private const val RELEVANT = AccessibilityEvent.WINDOWS_CHANGE_ADDED or AccessibilityEvent.WINDOWS_CHANGE_REMOVED or
             AccessibilityEvent.WINDOWS_CHANGE_BOUNDS
     }

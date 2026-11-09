@@ -13,6 +13,7 @@ import java.io.File
 class HidePathTest {
     private val code = File("src/main/java/com/meridian11/books/bentobar/bar/BarService.kt").readText()
     private val colors = File("src/main/java/com/meridian11/books/bentobar/bar/ColorReader.kt").readText()
+    private val menus = File("src/main/java/com/meridian11/books/bentobar/bar/MenuCoordinator.kt").readText()
 
     /** The branch of check() that runs when the strip is not to be shown. */
     private val hide = code.substringAfter("\"bar hidden (statusBar=").substringBefore("/** adb `debug trace on|off`")
@@ -59,7 +60,7 @@ class HidePathTest {
     }
 
     @Test fun anItemsMenuIsToldItIsOpeningBeforeItsFirstFrame() {
-        val toggle = code.substringAfter("fun toggleMenu(").substringBefore("val loc = strip.locationOnScreen()")
+        val toggle = menus.substringAfter("fun toggleMenu(").substringBefore("val loc = strip.locationOnScreen()")
         val close = toggle.indexOf("closeMenu(dissolve = true)")
         assertTrue("toggleMenu closes the old popup first", close >= 0)
         assertTrue("menuOpening runs after closeMenu(dissolve = true)", toggle.indexOf("menuOpening", close) > close)
@@ -71,6 +72,6 @@ class HidePathTest {
             ui.contains("onDispose { glow.gone(\"chevron\"); events.gone(\"chevron\") }"))
         assertTrue("items FitRow left out report going", Regex("""glow\.dropped\(ids\).*events::gone""").containsMatchIn(ui))
         assertTrue(Regex("""override fun gone\(id: String\) \{ placed -= id \}""").containsMatchIn(code))
-        assertFalse("outside() is the same rule as the tested one", "StripHighlight.target(x, placed" in code)
+        assertFalse("outside() is the same rule as the tested one", "StripHighlight.target(x, placed" in menus)
     }
 }
