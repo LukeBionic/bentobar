@@ -50,7 +50,10 @@ class TickLoopTest {
         clocks = { clockChecks++ },
         failedText = { "failed ${it.type}" },
         log = { what, e -> logs += what to e },
+        location = { items, sampled -> located += items.map { it.id } to sampled.map { it.id } },
     ))
+
+    private val located = ArrayList<Pair<List<String>, List<String>>>()
 
     /** Moves time on and runs the tick that was scheduled. */
     private fun tick(afterMs: Long = 1000) {
@@ -68,6 +71,21 @@ class TickLoopTest {
         loop.stop("bar")
         assertFalse(loop.running)
         assertEquals(0, scheduled.size)
+    }
+
+    @Test fun whereTheDeviceIsIsFollowedOncePerTickWithWhatIsSampledAndLetGoWhenNothingShows() {
+        type("weather"); type("air")
+        layout(item("w", "weather"), item("a", "air"), item("off", "air", Section.OFF))
+        loop.start("bar")
+        tick()
+        assertEquals("one call for both types' items", 2, located.size)
+        assertEquals(listOf("w", "a", "off") to listOf("w", "a"), located.last())
+        // The last Weather item stops being sampled: what the Air item still wants goes on.
+        layout(item("a", "air"))
+        tick()
+        assertEquals(listOf("a") to listOf("a"), located.last())
+        loop.stop("bar")
+        assertEquals(listOf("a") to emptyList<String>(), located.last())
     }
 
     @Test fun eachTypeIsToldWhenItStartsAndStopsBeingSampledOncePerChange() {

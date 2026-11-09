@@ -54,7 +54,7 @@ internal fun AirMenu(item: ItemConfig, host: MenuHost) {
     val online by Online.state.collectAsState()
     val on = Online.Service.OPEN_METEO in online.on
     val now = Now.wall()
-    val place = AirLoad.place(item, WeatherHere.fix)
+    val place = AirLoad.place(item, WeatherHere.place)
     LaunchedEffect(item.id, place, on) { AirItem.opened(item) }
 
     var changing by remember(item.id) { mutableStateOf(false) }

@@ -5,6 +5,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import com.meridian11.books.bentobar.R
+import com.meridian11.books.bentobar.data.Online
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.util.Now
 
@@ -46,5 +47,6 @@ private object TickerOnDevice {
         clocks = { Timers.check(); Caffeine.check() },
         failedText = { Env.str(R.string.item_failed, it.title) },
         log = { what, e -> if (e == null) Log.w(TAG, what) else Log.w(TAG, what, e) },
+        location = { items, sampled -> WeatherHere.follow(items, sampled, Online.on(Online.Service.OPEN_METEO)) },
     )
 }

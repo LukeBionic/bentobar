@@ -18,7 +18,9 @@ open class TickLoop(private val wiring: Wiring) {
      * now and [cancel] takes back one that hasn't run. [elapsed] counts sleep and is what intervals are measured in;
      * [sampleClock] is what a type's [ItemType.sample] is told; [wall] aligns a tick to the second. [type] and [config] are the
      * registry and the layout. [sampleEnv] runs the shared samplers, [clocks] the timer's and keep awake's looks at the clock.
-     * [failedText] is what an item that failed says it did.
+     * [failedText] is what an item that failed says it did. [location] is told, once per tick and before the types'
+     * samplers, what the items of the layout and the sampled ones are, so My location has one owner however many
+     * types use it ([ItemType.usesMyLocation]); sampled is empty when nothing shows items.
      */
     class Wiring(
         val post: (Runnable) -> Unit,
@@ -35,6 +37,7 @@ open class TickLoop(private val wiring: Wiring) {
         val clocks: () -> Unit,
         val failedText: (ItemType) -> String,
         val log: (what: String, error: Throwable?) -> Unit,
+        val location: (items: List<ItemConfig>, sampled: List<ItemConfig>) -> Unit = { _, _ -> },
     )
 
     private val users = HashSet<String>()
@@ -143,6 +146,7 @@ open class TickLoop(private val wiring: Wiring) {
             running = false
             // Nothing shows items any more: every type lets go of what it listens to.
             lifeCycle(emptySet())
+            ItemGuard.run(false, "location failed", wiring.log) { wiring.location(wiring.config().items, emptyList()) }
         }
     }
 
@@ -225,7 +229,11 @@ open class TickLoop(private val wiring: Wiring) {
             val due = if (scheduled) sampled else sampled - samplersInUse
             samplersInUse.clear(); samplersInUse += sampled
             if (due.isNotEmpty()) wiring.sampleEnv(now, due)
-            if (users.isNotEmpty()) for (t in types) hook(t, "sample") { it.sample(wiring.sampleClock()) }
+            if (users.isNotEmpty()) {
+                // Before the types' samplers, so one that reads where the device is sees this tick's answer; once, whoever uses it.
+                ItemGuard.run(false, "location failed", wiring.log) { wiring.location(cfg.items, live) }
+                for (t in types) hook(t, "sample") { it.sample(wiring.sampleClock()) }
+            }
         }
         // Behind a guard of their own: a sampler that fails must not cost a timer or keep awake this tick's look at the clock.
         ItemGuard.run(false, "clock check failed", wiring.log) { wiring.clocks() }

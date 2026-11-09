@@ -50,7 +50,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         up = Now::elapsed,
         layout = { Store.config.value.items },
         staged = { stagedFailure.getAndSet(null) },
-        here = { WeatherHere.fix },
+        here = { WeatherHere.place },
         locating = { WeatherHere.why },
     )
 
@@ -121,28 +121,20 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
      */
     private fun tidy() {
         val items = Store.config.value.items
-        val here = WeatherHere.fix
-        val near = here?.let { WeatherRules.nearby(it.lat, it.lon) }
+        val near = WeatherHere.place
         if (items === seenItems && near == seenNear) return
         seenItems = items
         seenNear = near
-        val places = WeatherLoad.places(items, here)
+        val places = WeatherLoad.places(items, near)
         if (places == keptFor) return
         keptFor = places
         source.keepOnly(places, cities = WeatherLoad.places(items))
     }
 
-    override fun sample(now: Long) {
-        // Kept for an item of My location outside Off, while the switch is on; asked for only while such an item is sampled (on screen, or waiting in Hidden for its Show when rule).
-        WeatherHere.follow(Store.config.value.items, Ticker.sampled, Online.on(online))
-        tidy()
-    }
+    override fun sample(now: Long) = tidy()
 
     // Also when the last Weather item went, or the last of My location went to Off: nothing samples this type any more, so this is the moment that is left.
-    override fun onIdle() {
-        WeatherHere.follow(Store.config.value.items, sampled = emptyList(), on = Online.on(online))
-        tidy()
-    }
+    override fun onIdle() = tidy()
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host -> WeatherMenu(item, host) }
 
@@ -187,8 +179,8 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
             val items = Store.config.value.items.filter { it.type == type }
             val first = firstShown()
             val reading = first?.let { source.peek(it) }
-            "staged=${stagedReading?.name ?: "none"} here=${if (WeatherHere.fix != null) "known" else WeatherHere.why} search=${if (stagedSearch == null) "real" else "staged"} fail=${stagedFailure.get() ?: "none"}" +
-                " items=${items.size} places=${WeatherLoad.places(items, WeatherHere.fix).size}" +
+            "staged=${stagedReading?.name ?: "none"} here=${if (WeatherHere.place != null) "known" else WeatherHere.why} search=${if (stagedSearch == null) "real" else "staged"} fail=${stagedFailure.get() ?: "none"}" +
+                " items=${items.size} places=${WeatherLoad.places(items, WeatherHere.place).size}" +
                 " on=${Online.on(online)} setUp=${Online.setUp(online)}" + (first?.let {
                     " first=${status(it, Now.wall()).javaClass.simpleName} loading=${source.loading(it)} failure=${reading?.failure ?: "none"}" +
                         " again=${againEntry(it)}" +

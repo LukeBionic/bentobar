@@ -41,7 +41,7 @@ object AirItem : ItemType("air", R.string.item_air_title, Sym.AIR, R.string.item
     internal fun reading(item: ItemConfig, ask: Boolean = true): AirReading? {
         staged.of(item)?.let { return it }
         if (!Online.on(online)) return null
-        val place = AirLoad.place(item, WeatherHere.fix) ?: return null
+        val place = AirLoad.place(item, WeatherHere.place) ?: return null
         if (ask && item.section != Section.OFF) {
             readings.want(place)
             readings.askIfOld(place, AirRules.AGAIN_MS, old = { AirRules.old(it, Now.wall(), Now.elapsed()) }, failed = { it.failure != null })
@@ -54,7 +54,7 @@ object AirItem : ItemType("air", R.string.item_air_title, Sym.AIR, R.string.item
         staged.of(item)?.let { return AirRules.status(hasPlace = true, on = true, setUp = true, reading = it, now = now) }
         val here = WeatherRules.here(item)
         val on = Online.on(online)
-        val place = AirLoad.place(item, WeatherHere.fix)
+        val place = AirLoad.place(item, WeatherHere.place)
         return AirRules.status(hasPlace = place != null, on = on, setUp = Online.setUp(online),
             reading = if (on) place?.let { readings.peek(it) } else null, now = now, up = Now.elapsed(),
             locating = if (here && place == null) WeatherHere.why else null)
@@ -62,13 +62,13 @@ object AirItem : ItemType("air", R.string.item_air_title, Sym.AIR, R.string.item
 
     internal fun opened(item: ItemConfig) {
         if (isStaged(item) || item.section == Section.OFF || !Online.on(online)) return
-        val place = AirLoad.place(item, WeatherHere.fix) ?: return
+        val place = AirLoad.place(item, WeatherHere.place) ?: return
         readings.menuOpened(place, AirRules.MENU_MS) { it.failure != null }
     }
 
     internal fun refresh(item: ItemConfig) {
         if (isStaged(item) || !Online.on(online)) return
-        val place = AirLoad.place(item, WeatherHere.fix) ?: return
+        val place = AirLoad.place(item, WeatherHere.place) ?: return
         readings.refresh(place, floorMs = 10_000L)
     }
 
@@ -134,13 +134,11 @@ object AirItem : ItemType("air", R.string.item_air_title, Sym.AIR, R.string.item
     }
 
     override fun sample(now: Long) {
-        WeatherHere.follow(Store.config.value.items, Ticker.sampled, Online.on(online))
-        readings.keepOnly(AirLoad.places(Store.config.value.items, WeatherHere.fix))
+        readings.keepOnly(AirLoad.places(Store.config.value.items, WeatherHere.place))
     }
 
     override fun onIdle() {
-        WeatherHere.follow(Store.config.value.items, sampled = emptyList(), on = Online.on(online))
-        readings.keepOnly(AirLoad.places(Store.config.value.items, WeatherHere.fix))
+        readings.keepOnly(AirLoad.places(Store.config.value.items, WeatherHere.place))
     }
 
     override fun forgetFetched() {

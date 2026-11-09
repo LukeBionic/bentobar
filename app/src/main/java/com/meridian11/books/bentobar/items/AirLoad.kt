@@ -22,10 +22,10 @@ object AirLoad {
         "forecast_days" to "1",
     ))
 
-    fun place(item: ItemConfig, here: Fix?): Place? =
-        if (WeatherRules.here(item)) here?.let { WeatherRules.nearby(it.lat, it.lon) } else WeatherRules.place(item)
+    /** The place [item] asks about: its city, or where the device is ([here], already rounded by [WeatherHere.place]). */
+    fun place(item: ItemConfig, here: Place?): Place? = if (WeatherRules.here(item)) here else WeatherRules.place(item)
 
-    fun places(items: List<ItemConfig>, here: Fix? = null): Set<Place> =
+    fun places(items: List<ItemConfig>, here: Place? = null): Set<Place> =
         items.filter { it.type == "air" && it.section != Section.OFF }.mapNotNullTo(HashSet()) { place(it, here) }
 
     /**
