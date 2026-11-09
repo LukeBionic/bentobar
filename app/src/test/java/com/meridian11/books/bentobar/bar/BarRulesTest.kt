@@ -1,6 +1,7 @@
 package com.meridian11.books.bentobar.bar
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -226,4 +227,31 @@ class BarRulesTest {
     }
 
     private companion object { const val BAR_ID = 10 }
+
+    // ---- what a layout change has to do with the bar ---------------------------------------------------
+
+    private val layout = com.meridian11.books.bentobar.data.BarConfig(items = listOf(com.meridian11.books.bentobar.data.ItemConfig("t", "text")))
+
+    /** A label typed letter by letter saves on every key: reading the bar's tree for each of them is the waste F64 names. */
+    @Test fun aLabelTypedLetterByLetterIsNotGeometry() {
+        val typed = layout.copy(items = layout.items.map { it.with("text", "h") })
+        assertEquals(BarRules.geometry(layout), BarRules.geometry(typed))
+    }
+
+    @Test fun whatMovesTheStripOrWhatItHoldsIsGeometry() {
+        val g = BarRules.geometry(layout)
+        assertNotEquals(g, BarRules.geometry(layout.copy(enabled = false)))
+        assertNotEquals(g, BarRules.geometry(layout.copy(position = com.meridian11.books.bentobar.data.Position.LEFT)))
+        assertNotEquals(g, BarRules.geometry(layout.copy(pill = com.meridian11.books.bentobar.data.Pill.SOLID)))
+        assertNotEquals(g, BarRules.geometry(layout.copy(spacing = layout.spacing + 2)))
+        assertNotEquals(g, BarRules.geometry(layout.copy(items = layout.items + com.meridian11.books.bentobar.data.ItemConfig("u", "text"))))
+        assertNotEquals(g, BarRules.geometry(layout.copy(items = layout.items.map { it.copy(section = com.meridian11.books.bentobar.data.Section.OFF) })))
+    }
+
+    @Test fun whatTheStripOnlyDrawsIsNotGeometry() {
+        val g = BarRules.geometry(layout)
+        assertEquals(g, BarRules.geometry(layout.copy(color = com.meridian11.books.bentobar.data.ColorMode.DARK)))
+        assertEquals(g, BarRules.geometry(layout.copy(textSize = com.meridian11.books.bentobar.data.TextSize.LARGE)))
+        assertEquals(g, BarRules.geometry(layout.copy(pinnedOpen = true, autoCollapseSec = 5)))
+    }
 }

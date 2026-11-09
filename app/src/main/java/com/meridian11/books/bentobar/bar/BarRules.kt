@@ -1,5 +1,10 @@
 package com.meridian11.books.bentobar.bar
 
+import com.meridian11.books.bentobar.data.BarConfig
+import com.meridian11.books.bentobar.data.Pill
+import com.meridian11.books.bentobar.data.Position
+import com.meridian11.books.bentobar.data.Section
+
 /**
  * A rectangle on the screen, in plain numbers (`android.graphics.Rect` is a stub in unit tests). It answers with the
  * names `Rect` does, so the code that places the strip reads the same either way.
@@ -86,6 +91,14 @@ internal data class BarDecision(
  * does everything that touches Android, and in the order that matters.
  */
 internal object BarRules {
+    /**
+     * What a change of the layout has to do with the bar: where the strip sits and what it holds. Everything else (a
+     * label typed letter by letter, a colour) the strip draws by itself, and the bar needs no second look for it.
+     */
+    data class Geometry(val enabled: Boolean, val position: Position, val pill: Pill, val spacing: Int, val items: List<Pair<String, Section>>)
+
+    fun geometry(cfg: BarConfig) = Geometry(cfg.enabled, cfg.position, cfg.pill, cfg.spacing, cfg.items.map { it.id to it.section })
+
     /** What asks [decide] for a reading of the bar's colors. */
     enum class Read { NEW_BAR_WINDOW, WINDOWS_MOVED }
 

@@ -304,6 +304,8 @@ class BarController(private val service: AccessibilityService) {
         main.postDelayed(scanNow, 200); colors.readSoon(ColorWatch.Cause.SLOW, 500)
     }
 
+    private var lastGeometry: BarRules.Geometry? = null
+
     private fun onConfig() {
         if (!started) return
         DisplaysItem.follow(true)
@@ -312,7 +314,8 @@ class BarController(private val service: AccessibilityService) {
         Store.config.value.let { if ((it.hiddenMode == HiddenMode.SHOW_ALL || it.presenting) && expanded.value) fold() }
         colors.applyLook()
         if (Ticker.running) Ticker.refresh()
-        scan()
+        // Every Store write lands here, and a label saves on every key: only what moves the strip asks the bar again.
+        BarRules.geometry(Store.config.value).let { if (it != lastGeometry) { lastGeometry = it; scan() } }
         Chips.update(service)
     }
 
