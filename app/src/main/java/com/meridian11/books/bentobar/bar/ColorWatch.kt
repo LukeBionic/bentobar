@@ -18,8 +18,10 @@ package com.meridian11.books.bentobar.bar
  * after [BUSY] readings within a minute a cause's first reading waits two seconds behind the last
  * one, and what follows it comes later ([LATER_MS]), where the next cause of a stream takes its
  * place. A stream that goes on is held further: after a minute of it two readings keep ten seconds
- * apart, after five minutes a minute apart, until it stops. Nothing is dropped: the last cause of a
- * stream still gets its readings, and the distance Android asks for ([MERGE_MS]) stays.
+ * apart, after five minutes a minute apart, until it stops. A slow cause's first reading is not held
+ * by that: the strip back on screen is not the stream's doing, and a bar still in the lock screen's
+ * look is what that reading is for, so it keeps only the two seconds. Nothing is dropped: the last
+ * cause of a stream still gets its readings, and the distance Android asks for ([MERGE_MS]) stays.
  */
 class ColorWatch {
     enum class Cause(internal val after: LongArray, internal val busy: LongArray) {
@@ -45,6 +47,8 @@ class ColorWatch {
     private var windowsDue: Long? = null
     /** When a change of windows last got its first reading. */
     private var windowsRead = -BarNeighbours.APART_MS
+    /** The first reading a slow cause still waits for, which a long stream's gap doesn't hold back. */
+    private var slowFirst: Long? = null
     /** The series still owed while the strip has nothing to draw ([pause]): SLOW, QUICK or none. */
     private var owed: Cause? = null
     /** When causes that kept coming began to be held back; null while no stream is. */
@@ -63,10 +67,11 @@ class ColorWatch {
         val busy = busy(now)
         var start = now + first
         // Not on the heels of a screenshot just asked for: Android would refuse this one.
-        asked.lastOrNull()?.let { start = maxOf(start, it + if (busy) gap(now) else MERGE_MS) }
+        val behind = when { !busy -> MERGE_MS; cause == Cause.SLOW -> BarNeighbours.APART_MS; else -> gap(now) }
+        asked.lastOrNull()?.let { start = maxOf(start, it + behind) }
         val times = (if (busy) cause.busy else cause.after).map { start + it }
         quick.clear(); windowsDue = null
-        if (cause == Cause.SLOW) { slow.clear(); slow += times } else quick += times
+        if (cause == Cause.SLOW) { slow.clear(); slow += times; slowFirst = start } else quick += times
         again = 0
     }
 
@@ -84,9 +89,10 @@ class ColorWatch {
     /** Milliseconds from [now] to the next reading (0 when it is overdue), or null when none is to come. */
     fun due(now: Long): Long? {
         val next = (slow + quick).minOrNull() ?: return null
-        // A long stream's gap holds for every reading of it, a cause's later ones and the follow-ups too.
+        // A long stream's gap holds for every reading of it, a cause's later ones and the follow-ups too; not for a slow cause's first.
         val earliest = asked.lastOrNull()?.takeIf { streamSince != null && gap(now) > BarNeighbours.APART_MS }?.plus(gap(now)) ?: next
-        return (maxOf(next, earliest) - now).coerceAtLeast(0)
+        val held = maxOf(next, earliest)
+        return (minOf(held, slowFirst ?: held) - now).coerceAtLeast(0)
     }
 
     /**
@@ -99,6 +105,7 @@ class ColorWatch {
         slow.removeAll { it <= now + MERGE_MS }
         quick.removeAll { it <= now + MERGE_MS }
         windowsDue?.let { if (it <= now + MERGE_MS) { windowsRead = now; windowsDue = null } }
+        slowFirst?.let { if (it <= now + MERGE_MS) slowFirst = null }
     }
 
     /**
@@ -126,7 +133,7 @@ class ColorWatch {
 
     /** The strip left the screen: what was to be read no longer matters, and its return asks again. */
     fun clear() {
-        slow.clear(); quick.clear(); windowsDue = null
+        slow.clear(); quick.clear(); windowsDue = null; slowFirst = null
         again = 0
         owed = null
     }
@@ -137,7 +144,7 @@ class ColorWatch {
      */
     fun pause() {
         owe(if (slow.isNotEmpty()) Cause.SLOW else if (quick.isNotEmpty()) Cause.QUICK else null)
-        slow.clear(); quick.clear(); windowsDue = null
+        slow.clear(); quick.clear(); windowsDue = null; slowFirst = null
         again = 0
     }
 

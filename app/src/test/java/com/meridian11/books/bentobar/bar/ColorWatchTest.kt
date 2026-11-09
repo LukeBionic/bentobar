@@ -421,17 +421,74 @@ class ColorWatchTest {
         assertTrue("the last change is read after it stopped", at.any { it > 600_000 })
     }
 
-    /** The gap holds for every reading of a stream that goes on: a cause's later readings and a change's follow-ups too. */
-    @Test fun inALongStreamEveryReadingKeepsTheGap() {
+    /** The gap holds for every reading a quick cause asks for in a stream that goes on: its later reading and a change's follow-ups too. */
+    @Test fun inALongStreamEveryReadingOfAQuickCauseKeepsTheGap() {
         val watch = ColorWatch()
         val at = ArrayList<Long>()
         for (t in 0L..1_000_000L step 100) {
-            // The bar changes at every reading, so each one asks for its follow-up; and a SLOW cause every nine seconds.
+            // The bar changes at every reading, so each one asks for its follow-up; and a QUICK cause every nine seconds.
             if (watch.due(t) == 0L) { at += t; watch.shot(t, Result.CHANGED) }
-            if (t % 9_000 == 0L) watch.cause(Cause.SLOW, t, 250)
+            if (t % 9_000 == 0L) watch.cause(Cause.QUICK, t, 250)
         }
         assertTrue("${at.filter { it in 90_000L..300_000L }.take(20)}", at.filter { it in 90_000L..300_000L }.zipWithNext().all { (a, b) -> b - a >= 10_000 })
         assertTrue("${at.filter { it > 400_000 }.take(20)}", at.filter { it > 400_000 }.zipWithNext().all { (a, b) -> b - a >= 60_000 })
+    }
+
+    /** A wallpaper's stream that has lasted [until] ms, every reading due asked for and answered at once, the last one at [until]. */
+    private fun ColorWatch.wallpaperStream(until: Long): ColorWatch {
+        for (t in 0L..until step 100) {
+            if (due(t) == 0L) shot(t, Result.SAME)
+            if (t % 1_000 == 0L) cause(Cause.QUICK, t, 300)
+        }
+        shot(until, Result.SAME)
+        return this
+    }
+
+    /**
+     * A live wallpaper has been reporting for ten minutes, and the screen is locked and unlocked twenty seconds later. The
+     * stream didn't cause that, and the bar has just kept the lock screen's look: the return's first reading comes when it
+     * always came, not when the stream's minute is up. What follows it keeps the gap.
+     */
+    @Test fun aLongStreamDoesNotHoldBackAReturnsFirstReading() {
+        val watch = ColorWatch().wallpaperStream(until = 600_000)
+        watch.clear() // the strip left the screen
+        watch.cause(Cause.SLOW, 620_000, 250)
+        assertEquals(250L, watch.due(620_000))
+        watch.shot(620_250, Result.SAME)
+        assertEquals(60_000L, watch.due(620_250))
+    }
+
+    /** A wallpaper's quick causes coming in between take nothing from it. */
+    @Test fun quickCausesOfALongStreamLeaveAReturnsFirstReadingAlone() {
+        val watch = ColorWatch().wallpaperStream(until = 600_000)
+        watch.clear()
+        watch.cause(Cause.SLOW, 620_000, 250)
+        watch.cause(Cause.QUICK, 620_100, 100)
+        assertEquals(150L, watch.due(620_100))
+    }
+
+    /** It is held to what the budget's first tier asks of a reading, two seconds behind the last one, and Android's distance with it. */
+    @Test fun aReturnsFirstReadingStaysTwoSecondsBehindTheLastOne() {
+        val watch = ColorWatch().wallpaperStream(until = 600_000)
+        watch.clear()
+        watch.shot(620_000, Result.SAME)
+        watch.cause(Cause.SLOW, 620_500, 250)
+        assertEquals(1_500L, watch.due(620_500))
+    }
+
+    /** What that costs: something that hides and shows the strip for good gets one reading for each return and no follow-ups. */
+    @Test fun inALongStreamAReturnCostsItsFirstReadingAndNoMore() {
+        val watch = ColorWatch()
+        val at = ArrayList<Long>()
+        for (t in 0L..1_000_000L step 100) {
+            // The bar changes at every reading, so each one would ask for its follow-up.
+            if (watch.due(t) == 0L) { at += t; watch.shot(t, Result.CHANGED) }
+            if (t % 9_000 == 0L) watch.cause(Cause.SLOW, t, 250)
+        }
+        val late = at.filter { it > 400_000 }
+        // 300: the first reading 250 ms after the cause, on this loop's tenths of a second.
+        assertTrue("${late.take(20)}", late.all { it % 9_000 == 300L })
+        assertTrue("${late.take(20)}", late.zipWithNext().all { (a, b) -> b - a == 9_000L })
     }
 
     /** Whatever the tier: two screenshots are never asked for within 400 ms. */
