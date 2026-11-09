@@ -13,9 +13,9 @@ import android.os.Looper
 import android.provider.CalendarContract
 import android.util.Log
 import com.meridian11.books.bentobar.R
+import com.meridian11.books.bentobar.util.Now
 import java.time.ZoneId
 import java.util.Locale
-import java.util.concurrent.Executors
 
 /** Upcoming calendar events from the Calendar provider (needs READ_CALENDAR). Tasks synced in by task apps are left out. */
 object Calendar {
@@ -42,17 +42,20 @@ object Calendar {
     }
 
     private const val TAG = "BentoBar"
+    /** How long what was read stays fresh; the provider changing reloads it at once. */
+    const val RELOAD_MS = 60_000L
     private lateinit var app: Context
-    private val io = Executors.newSingleThreadExecutor()
-    private val main = Handler(Looper.getMainLooper())
-    @Volatile var events: List<Event> = emptyList(); private set
-    @Volatile private var loadedAt = 0L
+    private val main by lazy { Handler(Looper.getMainLooper()) }
+    /**
+     * Calendar's loading is [Refresher]'s, one load at a time and one snapshot, but on a wiring of its own: `Background`'s
+     * stops loading while nothing shows items, and the Live Update chip needs meetings while the service is off.
+     */
+    private val loader = calendarLoader(
+        Refresher.Wiring(Background.executor("calendar"), { Background.onMain(it::run) }, Now::elapsed,
+            changed = { Chips.update(app) }, minGapMs = 0, mayLoad = ::allowed),
+    ) { load(System.currentTimeMillis()).takeIf { allowed() } }
+    val events: List<Event> get() = loader.peek(Unit).orEmpty()
     private var observing = false
-    /** A load is running; [again]: the provider changed meanwhile, so one more follows it. Main thread only. */
-    private var loading = false
-    private var again = false
-    /** Bumped by [forget]: a load started before then must not publish. */
-    private var generation = 0
 
     fun init(context: Context) { app = context.applicationContext }
 
@@ -64,30 +67,16 @@ object Calendar {
      * a sync that changes hundreds of events queues one more load, not hundreds. Main thread.
      */
     fun refresh(force: Boolean = false) {
-        val now = System.currentTimeMillis()
         if (!allowed()) { forget(); return }
-        if (!force && now - loadedAt < 60_000) return
-        loadedAt = now
         observe()
-        if (loading) { again = true; return }
-        loading = true
-        val gen = generation
-        io.execute {
-            val loaded = load(now)
-            main.post {
-                loading = false
-                if (gen == generation && allowed()) { events = loaded; Chips.update(app) }
-                if (again) { again = false; refresh(force = true) }
-            }
-        }
+        if (force) loader.refresh(Unit, afterRunning = true) else loader.want(Unit)
     }
 
     /** Calendar switched off in Setup: drop what was read, and whatever a running load returns. */
     fun forget() {
-        generation++
-        again = false
-        loadedAt = 0 // allowed again: load at once, not up to a minute later
-        if (events.isNotEmpty()) { events = emptyList(); if (::app.isInitialized) Chips.update(app) }
+        val had = events.isNotEmpty()
+        loader.forget()
+        if (had && ::app.isInitialized) Chips.update(app)
     }
 
     private fun observe() {
@@ -241,3 +230,10 @@ object Calendar {
             Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=$q")))
     }
 }
+
+/**
+ * How the calendar loads: [Refresher]'s rules, on the calendar's numbers. Pure, so the rules run in a test; [Calendar] gives
+ * it the app's wiring and the query.
+ */
+internal fun calendarLoader(wiring: Refresher.Wiring, load: () -> List<Calendar.Event>?): Refresher<Unit, List<Calendar.Event>> =
+    Refresher(wiring, every = { _, _ -> Calendar.RELOAD_MS }, load = { _, _ -> load() })
