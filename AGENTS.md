@@ -80,10 +80,9 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     counted as a reader counts it), and the item types: several each in
     `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own
     (`CpuItem`, `ClockItem`, `SoundItem`, `MediaItem`, `DevicesItem`, `HeatItem`, `WeatherItem`,
-    `FlightItem`, `ShortcutItem` with its pure `ShortcutRules`, `StocksItem`). `WeatherHere` is Weather's My location
-    (what it does is the pure `HereKeeper`, on `HereRules`): Android's approximate location, in memory
-    only, rounded to 0.1° (`WeatherRules.nearby`, in `WeatherLoad.place`) before anything is asked or
-    held under it; its reading is never kept on the device, and the layout holds `where=here` and never
+    `FlightItem`, `ShortcutItem` with its pure `ShortcutRules`, `StocksItem`). `WeatherHere` is My location for every item that uses it
+    (what it does is the pure `HereKeeper`, on `HereRules`; the `Ticker` drives it once per tick): Android's approximate location, in memory
+    only, rounded to 0.1° in `WeatherHere.place`, the only form anything else gets; its reading is never kept on the device, and the layout holds `where=here` and never
     a place. A type gets `onLive()`,
     `sample(now)` once a second and `onIdle()` from the `Ticker`: listeners and polls hang on those,
     so none exists while the bar is hidden, the screen is off or no such item is outside Off.
@@ -102,8 +101,11 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     `items/NowPlayingRules.kt`.
   - `net/`: the only code that opens a connection (pure Kotlin). `Host` is an enum of the hosts BentoBar may ask; a `Request` names one of them, a path and a query, so no call takes an
     address. `Http.get` refuses unless the service is switched on, an item that uses it is outside
-    Off and something that shows items is on screen, and never runs on the main thread. A query can
-    hold a key: a `Request` prints as host and path only, and no exception leaves `HttpTransport`.
+    Off and something that shows items is on screen, and never runs on the main thread. A `Request` holds no key:
+    `Http.key` is wired in `Env` and `HttpTransport` adds it, so no item's code ever holds one. A `Request` prints as host and path only, and no exception leaves `HttpTransport`.
+    One 429 or Retry-After holds the whole service (`Http.get` answers for it), and what the transport would refuse is `Why.REFUSED`, counted as nothing sent.
+  - `items/OnlineBase.kt` and `items/Places.kt` are what the online items share: the reply-to-failure mapping (`Failures`), the pace (`Pace`), the states (`Status`), the staged sample (`Staged`), what a place is. A sixth service
+    is a load, a rules file and a menu file; `OnlineServiceContract` in the tests gives it the failure tests.
   - `data/LayoutIntents.kt`: what a command does to an item (`show`, `hide`, `turnOff`, `putIn`, `setWhenActive`), as pure
     steps from one layout to the next: it changes the section and never the place in the list, which only a Move, drag or drop
     does (`moved`). A screen calls `Store.update { it.hide(id) }` and writes no section or rule of its own
@@ -305,7 +307,7 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   `HereKeeper`, pure and unit-tested; `WeatherHere` is the keeper on Android's location service).
   `ManifestTest` pins the permissions, the backup rules, cleartext off and the listener's entry;
   `HttpTest` and `HttpTransportTest` pin the hosts and what a request may carry; `OneWayOutTest` names
-  the files that may ask a service (`items/Weather*`, `Air*`, `Fx*`, `Flight*`, `AirLabs*`, `Stocks*`, `Finnhub*`) or read a key.
+  the files that may ask a service (`items/Weather*`, `Air*`, `Fx*`, `Flight*`, `AirLabs*`, `Stocks*`, `Finnhub*`); a key is read only by `Http.key`'s wiring in `items/Env.kt`.
 - **US stocks** (`StocksItem`, type "stocks", rules in `StocksRules`, requests and what is kept in `StocksLoad`, replies in
   `Finnhub`): US stocks only (Finnhub's free plan), with the user's own key; one quote request per stock,
   every 2 minutes while the market is open (`Market`: weekday hours in New York; a holiday is seen in quotes

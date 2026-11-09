@@ -51,6 +51,7 @@ class FakeHttp : Transport {
          */
         fun <T> use(test: (FakeHttp) -> T): T {
             val fake = FakeHttp()
+            Http.clock = { System.nanoTime() / 1_000_000 }
             Http.transport = fake
             // As the app wires it: the switch and key are `Online`'s, and no item's code ever holds a key.
             Http.key = { host -> Online.key(Online.serviceOf(host)).ifEmpty { null } }

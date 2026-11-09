@@ -60,7 +60,7 @@ class HttpTest {
 
     @Test fun onlyASegmentThatIsExactlyOneOrTwoDotsIsRefused() {
         for (path in listOf("/.", "/..", "/a/./b", "/a/../b", "/a/..", "/./a")) assertNull(path, HttpTransport.address(Request(Host.FRANKFURTER, path)))
-        // Exchange rates' open-ended date range ends in two dots: a segment like any other.
+        // A path segment that merely ends in two dots is a segment like any other (a date range, say).
         assertEquals("https://api.frankfurter.dev/v1/2026-10-05..?base=EUR",
             HttpTransport.address(Request(Host.FRANKFURTER, "/v1/2026-10-05..", listOf("base" to "EUR"))))
         for (path in listOf("/v1/a..b", "/v1/..a", "/v1/...", "/a.b/c")) assertEquals("https://airlabs.co$path", HttpTransport.address(Request(Host.AIRLABS, path)))

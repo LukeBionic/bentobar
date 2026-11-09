@@ -225,8 +225,15 @@ object StocksRules {
 
     // ---- numbers ---------------------------------------------------------------------------------
 
+    /** One per locale and decimals: the bar's text is built every second per stock, and a NumberFormat costs more to make than to use. */
+    private val formats = HashMap<Pair<Locale, Int>, NumberFormat>()
+
+    private fun numberFormat(l: Locale, decimals: Int): NumberFormat = synchronized(formats) {
+        formats.getOrPut(l to decimals) { NumberFormat.getNumberInstance(l).apply { minimumFractionDigits = decimals; maximumFractionDigits = decimals; isGroupingUsed = true } }
+    }
+
     private fun fixed(v: Double, decimals: Int, l: Locale): String =
-        NumberFormat.getNumberInstance(l).apply { minimumFractionDigits = decimals; maximumFractionDigits = decimals; isGroupingUsed = true }.format(v)
+        numberFormat(l, decimals).let { synchronized(it) { it.format(v) } }
 
     /** The decimals of a price, and of a change in dollars beside it: four under a dollar, else two. */
     private fun cents(price: Double?) = if ((price ?: 1.0) < 1) 4 else 2
