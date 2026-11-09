@@ -30,6 +30,14 @@ class HidePathTest {
         assertTrue(left, "watch.clear()" in left && "main.removeCallbacks(sample)" in left)
     }
 
+    /** A screenshot's answer can come after stop(): running it is what closes its buffer, so the thread it runs on stays. */
+    @Test fun aScreenshotAnsweredAfterStopStillClosesItsBuffer() {
+        val scan = File("src/main/java/com/meridian11/books/bentobar/bar/StatusBarScan.kt").readText()
+        assertFalse("the answers' thread is never shut down", ".shutdown()" in code || ".shutdown()" in scan)
+        assertFalse("no thread of the controller's own", "newSingleThreadExecutor" in code)
+        assertTrue("one thread for the whole process", Regex("""private val \w+ = Executors\.newSingleThreadExecutor\(\)""").containsMatchIn(scan))
+    }
+
     @Test fun whatTheHoverHeldOutFoldsAwayButWhatWasPinnedStays() {
         assertTrue(hide, Regex("""if \(!pinned && expanded\.value\) expanded\.value = false""").containsMatchIn(hide))
     }

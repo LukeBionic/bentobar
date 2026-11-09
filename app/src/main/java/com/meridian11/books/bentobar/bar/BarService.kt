@@ -49,7 +49,6 @@ import com.meridian11.books.bentobar.ui.MenuRoom
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import java.util.concurrent.Executors
 
 /**
  * BentoBar's accessibility service. It reads SystemUI's status bar window (layout and text colour)
@@ -118,9 +117,6 @@ class BarController(private val service: AccessibilityService) {
     private val wm = service.getSystemService(WindowManager::class.java)
     private val pm = service.getSystemService(PowerManager::class.java)
     private val km = service.getSystemService(KeyguardManager::class.java)
-    private val io = Executors.newSingleThreadExecutor()
-    /** [io] for screenshot results; one arriving after stop() shut it down is dropped, not thrown. */
-    private val callbacks = java.util.concurrent.Executor { r -> runCatching { io.execute(r) } }
     private val density get() = service.resources.displayMetrics.density
 
     // Read by the strip's composition.
@@ -141,7 +137,7 @@ class BarController(private val service: AccessibilityService) {
         override val empty get() = stripEmpty
         override val interactive get() = pm.isInteractive
         override val snapshot get() = snap
-    }) { s, done -> StatusBarScan.shoot(service, s, callbacks, done) }
+    }) { s, done -> StatusBarScan.shoot(service, s, done) }
     private val look get() = colors.look
     private val maxWidth = mutableIntStateOf(0)
     private val heightDp = mutableStateOf(36.dp)
@@ -265,7 +261,6 @@ class BarController(private val service: AccessibilityService) {
         DisplaysItem.follow(false)
         Ticker.stop("bar")
         scope.cancel()
-        io.shutdown()
     }
 
     /** Window events, logged only where asked for: `adb shell setprop log.tag.BentoBarEvents DEBUG`. */

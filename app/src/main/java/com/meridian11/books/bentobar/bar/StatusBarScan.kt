@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
-import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 /** Android's rectangle as a plain [Box], and back. */
 internal fun Rect.box() = Box(left, top, right, bottom)
@@ -52,12 +52,18 @@ object StatusBarScan {
     }
 
     /**
-     * A reading: a screenshot of the status bar window only, its pixels read for [ColorReader]. Android answers on
-     * [callbacks]. [done] gets the colours (null: the picture gave none), or the code of Android's refusal as its second
-     * argument.
+     * The screenshots' answers, on one thread for the whole process, never shut down: a controller that stops must not
+     * leave an answer with nowhere to run, because running it is what closes the screenshot's buffer ([barColors]). A
+     * result that arrives after stop() is then dropped on the main thread by [ColorReader]'s started check.
      */
-    fun shoot(service: AccessibilityService, s: BarSnapshot, callbacks: Executor, done: (BarColors?, Int?) -> Unit) {
-        service.takeScreenshotOfWindow(s.windowId, callbacks, object : AccessibilityService.TakeScreenshotCallback {
+    private val answers = Executors.newSingleThreadExecutor()
+
+    /**
+     * A reading: a screenshot of the status bar window only, its pixels read for [ColorReader]. [done] gets the colours
+     * (null: the picture gave none), or the code of Android's refusal as its second argument.
+     */
+    fun shoot(service: AccessibilityService, s: BarSnapshot, done: (BarColors?, Int?) -> Unit) {
+        service.takeScreenshotOfWindow(s.windowId, answers, object : AccessibilityService.TakeScreenshotCallback {
             override fun onSuccess(r: AccessibilityService.ScreenshotResult) { done(runCatching { barColors(r, s) }.getOrNull(), null) }
             override fun onFailure(code: Int) { done(null, code) }
         })
