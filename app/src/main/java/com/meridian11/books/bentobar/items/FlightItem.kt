@@ -302,12 +302,12 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     }
 
     /**
-     * The menu of the item [id] opens. Several flights found for it while the menu was closed are not
+     * The menu of [item] opens. Several flights found for it while the menu was closed are not
      * asked about now: a hidden item has no tick that would have let them go, and a list from an
      * earlier look is nobody's question. Before the menu reads what there is to show. Main thread.
      */
-    internal fun menuOpens(id: String) {
-        if (FlightLoad.turn(search.state.value, focused = id, opening = true) == FlightLoad.Turn.DROP) drop()
+    override fun menuOpening(item: ItemConfig) {
+        if (FlightLoad.turn(search.state.value, focused = item.id, opening = true) == FlightLoad.Turn.DROP) drop()
     }
 
     /**

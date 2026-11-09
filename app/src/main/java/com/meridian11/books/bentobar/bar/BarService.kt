@@ -803,6 +803,10 @@ class BarController(private val service: AccessibilityService) {
         }
         closeMenu(dissolve = true) // resets the sampling demand, so the new popup's is set after it
         val s = snap ?: return
+        // Before the popup's first frame reads anything (an item's own LaunchedEffect would run after it).
+        key.takeIf { it.startsWith("item:") }?.substringAfter(':')?.let { id ->
+            Store.config.value.items.firstOrNull { it.id == id }?.let { Items.of(it.type)?.menuOpening(it) }
+        }
         val loc = strip.locationOnScreen()
         val a = Rect(anchor).apply { offset(loc[0], loc[1]) }
         val bounds = wm.currentWindowMetrics.bounds

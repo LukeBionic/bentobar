@@ -211,6 +211,12 @@ abstract class ItemType(
     /** The drop-down menu. Null means the type has none (clicks go to [onClick]). */
     open val menu: (@Composable (item: ItemConfig, host: MenuHost) -> Unit)? = null
 
+    /**
+     * [item]'s menu is about to open, before its first composition: for what the menu must not read as it stands. In
+     * an effect it would come after the first frame, and in composition it would be a side effect. Main thread.
+     */
+    open fun menuOpening(item: ItemConfig) {}
+
     /** Type-specific settings, shown in BentoBar's settings. */
     open val options: (@Composable (item: ItemConfig, set: (ItemConfig) -> Unit) -> Unit)? = null
 
