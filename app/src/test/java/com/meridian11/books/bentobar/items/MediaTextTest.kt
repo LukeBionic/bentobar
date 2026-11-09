@@ -24,51 +24,13 @@ import java.io.File
  * never as themselves: the file then shows what it holds. The last test checks that.
  */
 class MediaTextTest {
-    /** The copy deck, as written there. The rules below are run with these words. */
-    private val deck = mapOf(
-        "item_media_title" to "Now playing",
-        "item_media_desc" to "What's playing, with pause and skip; shows while something plays",
-        "trigger_media" to "Show while something is playing, and for %1\$s after it pauses",
-        "trigger_media_short" to "shows while playing",
-        "media_nothing" to "Nothing playing",
-        "media_playing" to "Playing",
-        "media_player_paused" to "%1\$s · Paused",
-        "media_app_playing" to "%1\$s is playing",
-        "media_app_paused" to "%1\$s is paused",
-        "media_bar_both" to "%1\$s · %2\$s",
-        "media_track_by" to "%1\$s by %2\$s",
-        "media_position" to "Position",
-        "media_position_state" to "%1\$s of %2\$s",
-        "media_other_players" to "Other players",
-        "media_other_pause" to "Pause %1\$s",
-        "media_other_play" to "Play %1\$s",
-        "media_open_player" to "Open %1\$s",
-        "media_access_lead" to "See what's playing",
-        "media_access_explain" to "Android shares the title, artist and artwork only with apps that have notification access. " +
-            "BentoBar tells Android to send it no notifications at all; it reads only what your media players say is playing, and keeps that on this device.",
-        "media_access_restricted" to "Switch grayed out? Tap it, tap OK, then turn on Allow restricted settings in App info.",
-        "media_access_allow" to "Allow notification access",
-        "media_show_title" to "Title",
-        "media_show_both" to "Title and artist",
-        "media_show_artist" to "Artist",
-        "media_show_needs_access" to "Shows once notification access is on",
-        "media_click" to "A click",
-        "media_click_menu" to "Opens the menu",
-        "media_click_toggle" to "Plays or pauses",
-        "media_desc_playing_by" to "Playing: %1\$s by %2\$s",
-        "media_desc_playing" to "Playing: %1\$s",
-        "media_desc_paused" to "Paused: %1\$s",
-        "media_desc_playing_unknown" to "Something is playing",
-        "media_desc_paused_unknown" to "Playback paused",
-    )
-
-    /** Not in the copy deck: how the album joins a spoken track ("… by Miles Davis, Kind of Blue"), which the deck leaves to "joined". */
-    private val added = mapOf("media_track_album" to "%1\$s, %2\$s")
+    /** The app's own text files, so the rules are run with the words the app shows, not a copy of them. */
+    private val texts = StringFiles.read(listOf("strings.xml", "strings_media.xml")).strings
 
     /** The two words that are older than this item and live in strings.xml. */
     private val shared = mapOf(Word.PAUSED to ("common_paused" to "Paused"), Word.STARTING to ("status_starting" to "Starting…"))
 
-    private val words = MediaText.Words { word -> shared[word]?.second ?: (deck + added).getValue("media_" + word.name.lowercase()) }
+    private val words = MediaText.Words { word -> texts.getValue(shared[word]?.first ?: ("media_" + word.name.lowercase())) }
 
     /** A text of the characters with these numbers. */
     private fun u(vararg codePoints: Int) = String(codePoints, 0, codePoints.size)
@@ -859,6 +821,10 @@ class MediaTextTest {
     // ---- the text file, and what the item's own code may not do
 
     private fun strings(path: String): Map<String, String> = StringFiles.file(path)
+
+    @Test fun noStringInTheMediaFileIsLeftOverByTheCode() {
+        assertEquals("a string in strings_media.xml that no code shows", emptyList<String>(), StringFiles.unused("src/main/res/values/strings_media.xml"))
+    }
 
     @Test fun britishEnglishSpellsGreyedWithAnE() {
         val british = strings("src/main/res/values-en-rGB/strings_media.xml")
