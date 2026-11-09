@@ -128,11 +128,12 @@ internal object BarRules {
     fun isSpacer(id: String) = id.endsWith("DesktopStatusBarSpacer")
 
     /**
-     * What the tree of the status bar window [windowId], at [bar], says about the bar. [nodes] are in the walk's order;
-     * none at all means the window had no tree to read.
+     * What the tree of the status bar window [windowId], at [bar], says about the bar. [nodes] are in the walk's order.
+     * No nodes, or a root with no children (SystemUI mid-change), is no tree: its free area is unknown. A root with children
+     * and nothing labelled under it is a tree, or a bar with no spacer would have no widest gap to fall back on.
      */
     fun parse(windowId: Int, bar: Box, nodes: List<BarNode>): BarSnapshot {
-        if (nodes.isEmpty()) return BarSnapshot(windowId, bar, bar, null, NO_TREE)
+        if (nodes.isEmpty() || nodes.first().children == 0) return BarSnapshot(windowId, bar, bar, null, NO_TREE)
         var spacer: Box? = null
         var clock: Box? = null
         val parts = ArrayList<Box>()

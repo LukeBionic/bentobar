@@ -93,6 +93,23 @@ class StatusBarScanTest {
         assertNull(s.clock)
     }
 
+    @Test fun aRootWithNoChildrenIsNoTree() {
+        // SystemUI mid-change: a root and nothing under it. Read as a bar, all of it would be free, and the strip would cover its icons.
+        val root = listOf(BarNode("", bar, 0, children = 0))
+        assertEquals(BarRules.NO_TREE, BarRules.parse(7, bar, root).summary)
+        // And so the last reading of this bar stands, as for a window with no tree at all.
+        val last = BarSnapshot(7, bar, Box(168, 0, 1681, 41), null, "items")
+        assertEquals(last, BarRules.settled(BarRules.parse(7, bar, root), last))
+    }
+
+    @Test fun aRootWithChildrenIsATreeEvenWithNothingLabelledInIt() {
+        // Asking for labelled nodes would leave a bar with no spacer without the widest-gap fallback, and the strip would never show there.
+        val unlabelled = listOf(BarNode("", bar, 0, children = 1), node("wrapper", 0, 1920))
+        val s = BarRules.parse(7, bar, unlabelled)
+        assertEquals("", s.summary)
+        assertEquals(bar, s.free)
+    }
+
     @Test fun theBarIsTheSystemWindowAlongTheTop() {
         val system = WindowFact(1, WindowFact.Kind.SYSTEM, bar)
         assertEquals(system, BarRules.findBar(listOf(system), 1920, 45))
