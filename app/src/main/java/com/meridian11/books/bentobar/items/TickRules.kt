@@ -47,6 +47,6 @@ object TickRules {
      * menu ([focusItem]), or everything while the [settings] preview is open. A folded-away battery or
      * memory item costs nothing.
      */
-    fun needed(cfg: BarConfig, settings: Boolean, revealHidden: Boolean, focusItem: String?): List<ItemConfig> =
-        cfg.items.filter { it.section != Section.OFF && (settings || cfg.couldShow(it) || revealHidden || it.id == focusItem) }
+    fun needed(cfg: BarConfig, settings: Boolean, revealHidden: Boolean, focusItem: String?, type: (String) -> ItemType? = Items::of): List<ItemConfig> =
+        cfg.items.filter { it.section != Section.OFF && (settings || cfg.couldShow(it, type(it.type)) || revealHidden || it.id == focusItem) }
 }

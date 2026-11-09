@@ -194,7 +194,7 @@ fun BentoBarMenu(host: MenuHost, openItem: (ItemConfig) -> Unit, hideBar: () -> 
     // Worked out here, not when the menu opened, so an item popping out (or in) updates the list.
     val cfg by Store.config.collectAsState()
     val overflow by com.meridian11.books.bentobar.bar.BarOverflow.ids.collectAsState()
-    val hidden = if (everything) cfg.items.filter { it.section != Section.OFF }
+    val hidden = if (everything) cfg.items.filter { it.section != Section.OFF && Items.of(it.type) != null }
     else cfg.notDrawn { states[it.id]?.active == true }.let { waiting -> cfg.items.filter { it in waiting || it.id in overflow } }
     val first = remember { androidx.compose.ui.focus.FocusRequester() }
     if (everything) androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { first.requestFocus() } }

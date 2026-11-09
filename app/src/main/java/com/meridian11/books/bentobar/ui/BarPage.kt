@@ -99,6 +99,7 @@ import com.meridian11.books.bentobar.data.Position
 import com.meridian11.books.bentobar.data.Section
 import com.meridian11.books.bentobar.data.shows
 import com.meridian11.books.bentobar.data.behindChevron
+import com.meridian11.books.bentobar.data.sectionShows
 import com.meridian11.books.bentobar.data.HiddenMode
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.data.spacingDp
@@ -195,7 +196,8 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
     val cfg by Store.config.collectAsState()
     val tick by Ticker.tick.collectAsState()
     var expanded by remember { mutableStateOf(false) }
-    val visible = cfg.items.filter { cfg.shows(it, states[it.id]?.active == true) }
+    // The layout being edited, presenting or not; a type this version doesn't know draws nothing, here as in the strip.
+    val visible = cfg.items.filter { Items.of(it.type) != null && cfg.sectionShows(it, states[it.id]?.active == true) }
     val hidden = cfg.behindChevron { states[it.id]?.active == true }
     val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.placeholder(it)) } }
     // The preview uses the strip's real colours: the sampled bar when BentoBar is running and the
@@ -349,7 +351,8 @@ private val rowShape = RoundedCornerShape(14.dp)
 
 @Composable
 private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int, selected: Boolean, onSelect: (String?) -> Unit, reorder: Reorder) {
-    val type = Items.of(item.type) ?: return
+    val type = Items.of(item.type)
+    val name = rowName(item)
     var menu by remember { mutableStateOf(false) }
     val moveUp = stringResource(R.string.row_move_up)
     val moveDown = stringResource(R.string.row_move_down)
@@ -383,7 +386,7 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
                         else -> false
                     }
                 }
-                .clickable { onSelect(item.id) }.pointerHoverIcon(PointerIcon.Hand)
+                .clickable(enabled = type != null) { onSelect(item.id) }.pointerHoverIcon(PointerIcon.Hand)
                 .semantics { customActions = actions }
                 .padding(start = 2.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -396,7 +399,7 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
             RowBody(item, state)
         }
         Box {
-            IconButton(onClick = { menu = true }) { SymIcon(Sym.MENU, size = 18.sp, contentDescription = stringResource(R.string.row_more, type.title)) }
+            IconButton(onClick = { menu = true }) { SymIcon(Sym.MENU, size = 18.sp, contentDescription = stringResource(R.string.row_more, name)) }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 if (index > 0) DropdownMenuItem(text = { Text(moveUp) }, onClick = { menu = false; move(index - 1) },
                     leadingIcon = { SymIcon(Sym.ARROW_UPWARD, size = 18.sp) })
@@ -418,7 +421,7 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
 /** The floating copy of a row while it's dragged: same size and content, lifted. */
 @Composable
 private fun RowGhost(item: ItemConfig, state: ItemState?) {
-    val type = Items.of(item.type) ?: return
+    val name = rowName(item)
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp).shadow(8.dp, rowShape).clip(rowShape)
         .background(MaterialTheme.colorScheme.surfaceContainerHighest), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).padding(start = 2.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -427,21 +430,26 @@ private fun RowGhost(item: ItemConfig, state: ItemState?) {
             }
             RowBody(item, state)
         }
-        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { SymIcon(Sym.MENU, size = 18.sp, contentDescription = type.title) }
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { SymIcon(Sym.MENU, size = 18.sp, contentDescription = name) }
     }
 }
+
+/** What a row calls an item: a type this version doesn't know has no name here, only where it came from. */
+@Composable
+private fun rowName(item: ItemConfig): String = Items.of(item.type)?.title ?: stringResource(R.string.row_from_newer)
 
 /** The item's icon, name and detail line, shared by the row and its dragged copy. */
 @Composable
 private fun RowScope.RowBody(item: ItemConfig, state: ItemState?) {
-    val type = Items.of(item.type) ?: return
+    val type = Items.of(item.type)
     Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest),
-        contentAlignment = Alignment.Center) { SymIcon(type.icon, size = 20.sp) }
+        contentAlignment = Alignment.Center) { SymIcon(type?.icon ?: Sym.UPDATE, size = 20.sp) }
     Spacer(Modifier.width(12.dp))
     Column(Modifier.weight(1f)) {
-        Text(type.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(rowName(item), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
         val overflow by com.meridian11.books.bentobar.bar.BarOverflow.ids.collectAsState()
-        val detail = listOfNotNull(if (item.id in overflow) stringResource(R.string.row_overflow) else null,
+        val detail = if (type == null) stringResource(R.string.row_from_newer_detail) else listOfNotNull(
+            if (item.id in overflow) stringResource(R.string.row_overflow) else null,
             state?.text?.takeIf { it.isNotBlank() },
             // The rule in short ("shows above 80% CPU"), so the list says when each hidden item pops out.
             if (item.whenActive && item.section == Section.HIDDEN) type.trigger?.short(item) ?: stringResource(R.string.row_when_active) else null,

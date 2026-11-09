@@ -1,5 +1,7 @@
 package com.meridian11.books.bentobar.data
 
+import com.meridian11.books.bentobar.items.ItemType
+import com.meridian11.books.bentobar.items.Items
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -194,8 +196,20 @@ fun BarConfig.migrateToV3(): BarConfig = if (version >= 3) this else copy(
     items = if (chevron) items else items.map { if (it.section == Section.HIDDEN && !it.whenActive) it.copy(section = Section.OFF) else it },
 )
 
-/** Whether an item in the bar config is drawn right now (outside presenting), for the strip and the preview. */
-fun BarConfig.shows(item: ItemConfig, active: Boolean): Boolean = when (item.section) {
+/**
+ * Whether an item is drawn right now: the one rule for the strip and, through [couldShow], for the ticker, so what is drawn
+ * is what is sampled. While presenting, only a type that [presents][ItemType.presents] and has something to say, whatever
+ * its section but Off. A type this version doesn't know (a pasted layout, a restore from a newer install) isn't drawn: it
+ * stays in the layout, marked in settings, so an update brings it back.
+ */
+fun BarConfig.shows(item: ItemConfig, active: Boolean, type: ItemType? = Items.of(item.type)): Boolean = when {
+    type == null -> false
+    presenting -> item.section != Section.OFF && type.presents && active
+    else -> sectionShows(item, active)
+}
+
+/** What [item]'s section says, presenting aside: the layout as it is edited, which the settings preview shows and the ‹ lists go by. */
+fun BarConfig.sectionShows(item: ItemConfig, active: Boolean): Boolean = when (item.section) {
     Section.SHOWN -> true
     Section.HIDDEN -> if (hiddenMode == HiddenMode.SHOW_ALL) !item.whenActive || active else item.whenActive && active
     Section.OFF -> false
@@ -206,14 +220,14 @@ fun BarConfig.shows(item: ItemConfig, active: Boolean): Boolean = when (item.sec
  * ones that aren't out on their own. The strip, the settings preview and the controller all ask here.
  */
 fun BarConfig.behindChevron(active: (ItemConfig) -> Boolean): List<ItemConfig> =
-    if (hiddenMode == HiddenMode.SHOW_ALL) emptyList() else items.filter { it.section == Section.HIDDEN && !shows(it, active(it)) }
+    if (hiddenMode == HiddenMode.SHOW_ALL) emptyList() else items.filter { it.section == Section.HIDDEN && Items.of(it.type) != null && !sectionShows(it, active(it)) }
 
 /**
  * The items the ‹ menu lists as hidden: in the layout but not drawn right now. Under Show everything
  * that's a rule item waiting for its rule, never a hidden item that is drawn.
  */
 fun BarConfig.notDrawn(active: (ItemConfig) -> Boolean): List<ItemConfig> =
-    items.filter { it.section != Section.OFF && !shows(it, active(it)) }
+    items.filter { it.section != Section.OFF && Items.of(it.type) != null && !sectionShows(it, active(it)) }
 
-/** Whether [shows] can be true for [item] once its "Show when" rule applies: the items worth sampling. */
-fun BarConfig.couldShow(item: ItemConfig): Boolean = shows(item, active = true)
+/** Whether [shows] can be true for [item] once it has something to say: the items worth sampling. */
+fun BarConfig.couldShow(item: ItemConfig, type: ItemType? = Items.of(item.type)): Boolean = shows(item, active = true, type)

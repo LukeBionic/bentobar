@@ -103,9 +103,6 @@ class BarService : AccessibilityService() {
     fun controller(): BarController? = bar
 }
 
-/** Item types still shown while presenting (when active): a running timer, a meeting about to start. */
-private val PRESENTING_TYPES = setOf("timer", "countdown", "event")
-
 class BarController(private val service: AccessibilityService) {
     private val tag = BarService.TAG
     private val main = Handler(Looper.getMainLooper())
@@ -436,11 +433,9 @@ class BarController(private val service: AccessibilityService) {
         val cfg by Store.config.collectAsState()
         val states by Ticker.states.collectAsState()
         val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.placeholder(it)) } }
-        // Presenting (screen sharing): only what matters on stage, whatever its section.
         // While dragging, the bar shows the order the item would land in.
         val items = dragPreview.value?.let { (id, at) -> cfg.items.moved(id, Section.SHOWN, at) } ?: cfg.items
-        val visible = (if (cfg.presenting) items.filter { it.section != Section.OFF && it.type in PRESENTING_TYPES && states[it.id]?.active == true }
-        else items.filter { cfg.shows(it, states[it.id]?.active == true) })
+        val visible = items.filter { cfg.shows(it, states[it.id]?.active == true) }
             // Next meeting stays at the far left: its text changes width most, and there it moves nothing else.
             .sortedBy { if (it.type == Store.PINNED_LEFT) 0 else 1 }
         // Behind ‹ (click or hover modes): hidden items not out on their own. Show everything: none.
