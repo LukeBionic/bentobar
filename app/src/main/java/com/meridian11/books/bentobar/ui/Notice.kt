@@ -22,8 +22,12 @@ object Notice {
 
     val messages = MutableSharedFlow<Message>(extraBufferCapacity = 4)
 
-    /** [onGone]: when the message has run its time or was acted on. Not when it is replaced or the window goes (a recreated window may offer it again). */
-    fun post(text: String, action: String? = null, onAction: (() -> Unit)? = null, onGone: (() -> Unit)? = null) {
+    /**
+     * [onAction] comes last so that a trailing lambda, `post(text, label) { … }`, is the action, as it reads. [onGone] must be
+     * passed by name: as the last parameter it once took that trailing lambda, and an added item was removed when its message ran out.
+     * [onGone]: when the message has run its time or was acted on. Not when it is replaced or the window goes (a recreated window may offer it again).
+     */
+    fun post(text: String, action: String? = null, onGone: (() -> Unit)? = null, onAction: (() -> Unit)? = null) {
         if (action == null) android.widget.Toast.makeText(com.meridian11.books.bentobar.items.Env.app, text, android.widget.Toast.LENGTH_SHORT).show()
         else messages.tryEmit(Message(text, action, onAction, onGone))
     }
