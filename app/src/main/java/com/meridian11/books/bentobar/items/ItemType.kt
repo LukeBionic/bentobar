@@ -244,10 +244,15 @@ abstract class ItemType(
     open fun debug(args: List<String>): String? = null
 
     /**
-     * What [debug] can stage, each as the words that follow the type's name (`stage rain-soon`). The test that composes every
-     * item's menu goes through these under the registered types, so a staged state is covered by being named here; `off` ends it.
+     * What [debug] can stage in this type's menu, each as the words that follow the type's name (`stage rain-soon`); `off` ends it.
+     * The test that composes every item's menu goes through these, in this order, under the registered types. Each must be answered
+     * (a hook says null to what it doesn't know, or can't do for the item it finds) and must change what the menu draws, or the test
+     * fails: a state that is named here and never reached would guard nothing. So the order matters where one stage hides another.
      */
     open val stages: List<String> = emptyList()
+
+    /** What an item of this type needs in its options for [stages] to have something to show, merged into the one the test composes. */
+    open val stageOptions: Map<String, String> = emptyMap()
 
     /** The drop-down menu. Null means the type has none (clicks go to [onClick]). */
     open val menu: (@Composable (item: ItemConfig, host: MenuHost) -> Unit)? = null

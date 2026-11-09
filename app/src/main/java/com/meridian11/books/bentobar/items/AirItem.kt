@@ -154,7 +154,7 @@ object AirItem : ItemType("air", R.string.item_air_title, Sym.AIR, R.string.item
         null -> "staged=${staged.value != null} on=${Online.on(online)}"
         "stage" -> {
             val s = AirRules.sample(args.getOrNull(1).orEmpty(), Now.wall())
-            if (s == null) "air stage good|moderate|smoke|highuv|offline" else {
+            if (s == null) null else {
                 staged.value = s
                 Ticker.refresh(type)
                 "staged ${args[1]}"

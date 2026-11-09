@@ -174,7 +174,8 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
      * `weather fail error|slow-down|offline`, `weather off`, and `weather` alone for where things
      * stand. What it answers is logged, so it names no city and no coordinates.
      */
-    override val stages = WeatherSamples.names.map { "stage $it" } + listOf("places", "none", "offline", "error", "busy").map { "search $it" }
+    // The searches first: the field they answer in is drawn while nothing is set up, which a staged sample ends.
+    override val stages = listOf("places", "none", "offline", "error", "busy").map { "search $it" } + WeatherSamples.names.map { "stage $it" }
 
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> {
@@ -191,7 +192,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         }
         "stage" -> {
             val sample = WeatherSamples.of(args.getOrNull(1).orEmpty(), Now.wall(), ZoneId.systemDefault())
-            if (sample == null) "no such sample; there are: ${WeatherSamples.names.joinToString(" ")}" else {
+            if (sample == null) null else {
                 stagedReading = sample
                 stagedSince = Now.elapsed()
                 Ticker.refresh()
@@ -210,14 +211,15 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
                 "offline" -> Ask.State.Done(asked, Found.Offline)
                 "error" -> Ask.State.Done(asked, Found.NoAnswer)
                 "busy" -> Ask.State.Busy(asked)
-                else -> null
+                "off", null -> null
+                else -> return null
             }
             stagedSearch = state
             Ticker.refresh()
             if (state == null) "search staging off (places, none, offline, error or busy stage an answer)" else "staged a search answer: ${args[1]}"
         }
         "fail" -> {
-            val failure = when (args.getOrNull(1)) { "error" -> Failure.NO_ANSWER; "slow-down" -> Failure.SLOW_DOWN; "offline" -> Failure.OFFLINE; else -> null }
+            val failure = when (args.getOrNull(1)) { "error" -> Failure.NO_ANSWER; "slow-down" -> Failure.SLOW_DOWN; "offline" -> Failure.OFFLINE; "off", null -> null; else -> return null }
             stagedFailure.set(failure)
             if (failure == null) "no failure staged (error, slow-down or offline stage one)"
             else "the next forecast request is not sent and counts as ${args[1]}"

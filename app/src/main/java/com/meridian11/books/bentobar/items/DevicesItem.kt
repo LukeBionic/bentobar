@@ -168,13 +168,12 @@ object DevicesItem : ItemType("devices", R.string.item_devices_title, Sym.MOUSE,
      * to name one), `stage none` no device at all, `off` the real ones again. Without a word: what is
      * shown now.
      */
-    override val stages = listOf("stage none", "stage mouse=15 keyboard=40c stylus=unknown", "stage keyboard:Keychron_K3=85c", "stage mouse=5")
+    override val stages = listOf("stage mouse=15 keyboard=40c stylus=unknown", "stage keyboard:Keychron_K3=85c", "stage mouse=5", "stage none")
 
     override fun debug(args: List<String>): String? {
         when (args.firstOrNull()) {
             null -> return line()
-            "stage" -> staged = DevicesRules.staged(args.drop(1))
-                ?: return "devices stage none | KIND[:NAME]=LEVEL[c] …, for example mouse=15 keyboard:Keychron_K3=85c stylus=unknown"
+            "stage" -> staged = DevicesRules.staged(args.drop(1)) ?: return null
             "off" -> { staged = null; changed() }
             else -> return null
         }

@@ -181,12 +181,10 @@ object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R
             help = stringResource(if (fixed) R.string.sound_slider_fixed else R.string.sound_slider_help)) { set(item.with("slider", it.toString())) }
     }
 
-    override val stages = listOf("fixed on", "fixed off")
-
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
-        // `sound fixed on|off` stages a fixed (or a settable) volume, anything else ends the staging.
+        // `sound fixed on|off` stages a fixed (or a settable) volume; `sound off`, or `sound fixed` with no word, ends the staging.
         "fixed" -> {
-            fixedStaged = when (args.getOrNull(1)) { "on" -> true; "off" -> false; else -> null }
+            fixedStaged = when (args.getOrNull(1)) { "on" -> true; "off" -> false; null -> null; else -> return null }
             Ticker.refresh()
             "fixed volume staged=$fixedStaged"
         }

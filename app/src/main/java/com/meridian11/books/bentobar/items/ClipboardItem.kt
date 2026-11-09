@@ -232,7 +232,7 @@ object ClipboardItem : ItemType("clipboard", R.string.item_clipboard_title, Sym.
                 Ticker.refresh(type)
                 "staged empty clipboard"
             }
-            else -> "clipboard stage sample|empty"
+            else -> null
         }
         "off" -> {
             staged = null

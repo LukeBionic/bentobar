@@ -219,7 +219,7 @@ object DisplaysItem : ItemType("displays", R.string.item_displays_title, Sym.DES
         null -> "staged=${staged != null} screens=${currentScreens().size} external=${currentScreens().count { !it.builtIn }} awake=${keepingAwake.value}"
         "stage" -> {
             val s = DisplaysRules.staged(args.getOrNull(1).orEmpty())
-            if (s == null) "displays stage 4k|dual|none" else {
+            if (s == null) null else {
                 staged = s
                 syncAwake()
                 Ticker.refresh(type)

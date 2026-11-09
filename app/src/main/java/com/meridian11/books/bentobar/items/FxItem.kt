@@ -123,7 +123,7 @@ object FxItem : ItemType("fx", R.string.item_fx_title, Sym.SWAP_VERT, R.string.i
         null -> "staged=${staged.value != null} on=${Online.on(online)}"
         "stage" -> {
             val s = FxRules.sample(args.getOrNull(1).orEmpty(), Now.wall())
-            if (s == null) "fx stage calm|big|offline|old" else {
+            if (s == null) null else {
                 staged.value = s
                 Ticker.refresh(type)
                 "staged ${args[1]}"

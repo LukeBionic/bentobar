@@ -165,9 +165,12 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
     /**
      * `./bento debug stocks stage up|down|mixed|big|closed|loading|offline|refused|nokey|none`, `stocks off`,
      * and `stocks` alone for where things stand. Staged quotes are for the symbols of the first Stocks
-     * item, made up from its own symbols, so a test sets the stocks first (`set ID stocks=…`).
+     * item, made up from its own symbols, so a test sets the stocks first (`set ID stocks=…`): every
+     * state but `nokey` and `none` draws a row for each, and without any it is refused.
      */
     override val stages = listOf("up", "down", "mixed", "big", "closed", "loading", "offline", "refused", "nokey", "none").map { "stage $it" }
+
+    override val stageOptions = mapOf("stocks" to """[{"s":"AAPL","n":"Apple"},{"s":"MSFT","n":"Microsoft"},{"s":"NVDA","n":"NVIDIA"}]""")
 
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> {
@@ -181,8 +184,8 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
                 } ?: "")
         }
         "stage" -> {
-            val f = first()
-            val symbols = f?.let { StocksRules.stocks(it).map(Stock::symbol) }.orEmpty().ifEmpty { listOf("AAPL", "MSFT", "NVDA") }
+            val f = first() ?: return null
+            val symbols = StocksRules.stocks(f).map(Stock::symbol)
             val now = Now.wall()
             val at = now / 1000
             fun q(i: Int, pct: Double, failure: Finnhub.Failure? = null): Quote {
@@ -192,6 +195,7 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
             }
             val all = symbols.indices
             val name = args.getOrNull(1).orEmpty()
+            if (symbols.isEmpty() && name != "nokey" && name != "none") return null
             val made: Staged? = when (name) {
                 "up" -> Staged(name, StocksStatus.Live, all.associate { symbols[it] to q(it, 0.8 + it * 0.4) })
                 "down" -> Staged(name, StocksStatus.Live, all.associate { symbols[it] to q(it, -0.6 - it * 0.3) })
@@ -205,7 +209,7 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
                 "none" -> Staged(name, StocksStatus.NoStocks, emptyMap())
                 else -> null
             }
-            if (made == null) "no such sample; there are: up down mixed big closed loading offline refused nokey none" else {
+            if (made == null) null else {
                 staged = made
                 Ticker.refresh(type)
                 "staged $name for the first Stocks item"

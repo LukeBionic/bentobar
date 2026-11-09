@@ -508,10 +508,10 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         else -> null
     }
 
-    private fun show(name: String?, turn: String?): String {
+    private fun show(name: String?, turn: String?): String? {
         if (name == null) return FlightSamples.names
-        if (first() == null) return "no Flight item outside Off: add one first (add flight)"
-        val sample = FlightSamples.of(name, turn, Now.wall()) ?: return "no sample $name ${turn.orEmpty()}: ${FlightSamples.names}"
+        if (first() == null) return null
+        val sample = FlightSamples.of(name, turn, Now.wall()) ?: return null
         stage(sample, listOfNotNull(name, turn).joinToString(" "))
         return "$stagedAs: ${reads(sample)}"
     }
