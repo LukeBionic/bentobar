@@ -2,9 +2,11 @@ package com.meridian11.books.bentobar.items
 
 import android.annotation.SuppressLint
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.AdaptiveIconDrawable
@@ -46,6 +48,7 @@ import androidx.compose.ui.res.stringResource
 import com.meridian11.books.bentobar.R
 import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.SPACER_DP
+import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.data.spacerWidthDp
 import com.meridian11.books.bentobar.ui.ActionTile
 import com.meridian11.books.bentobar.ui.ChoiceRow
@@ -226,13 +229,40 @@ object ToolsItem : ItemType("tools", R.string.item_tools_title, Sym.HANDYMAN, R.
 object Apps {
     data class App(val component: ComponentName, val label: String)
 
-    private const val MAX_ICONS = 128
-    private const val MAX_LABELS = 256
-    private val icons = object : LinkedHashMap<String, Bitmap>(64, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?) = size > MAX_ICONS
+    private val icons = SlowCache<String, Bitmap>(128)
+    private val labels = SlowCache<ComponentName, String>(256)
+
+    /** Which item types want to hear of an app changing: while one is live, and not otherwise. Main thread. */
+    private val watchers = Holders(0, { _, _ -> }, {}, ::startWatching, ::stopWatching)
+
+    /** [who] (an item type going live) shows apps: what was kept of one that changes is dropped from now on. */
+    fun watch(who: String) = watchers.hold(who)
+
+    fun unwatch(who: String) = watchers.release(who)
+
+    /** Installed, updated, turned off or removed. No permission asked: these broadcasts come to any app that can see the package, and this one sees the launchable apps. */
+    private val packages = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val pkg = intent.data?.schemeSpecificPart ?: return
+            forget(pkg)
+            AppItem.packageChanged(pkg)
+        }
     }
-    private val labels = object : LinkedHashMap<ComponentName, String>(64, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ComponentName, String>?) = size > MAX_LABELS
+
+    private fun startWatching() {
+        Env.app.registerReceiver(packages, IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED); addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addDataScheme("package")
+        }, Context.RECEIVER_NOT_EXPORTED)
+    }
+
+    private fun stopWatching() = Env.app.unregisterReceiver(packages)
+
+    /** What was kept of [pkg] is out of date; [icon] and [label] read it again. */
+    fun forget(pkg: String) {
+        icons.forget { it.startsWith("$pkg/") }
+        labels.forget { it.packageName == pkg }
     }
 
     fun list(context: Context): List<App> {
@@ -241,7 +271,7 @@ object Apps {
             .map {
                 val cn = ComponentName(it.activityInfo.packageName, it.activityInfo.name)
                 val l = it.loadLabel(pm).toString()
-                synchronized(labels) { labels[cn] = l }
+                labels.put(cn, l)
                 App(cn, l)
             }
             .filter { it.component.packageName != context.packageName }
@@ -249,24 +279,22 @@ object Apps {
     }
 
     /** [label] if it's been read already: cheap enough to call while composing. */
-    fun cachedLabel(cn: ComponentName): String? = synchronized(labels) { labels[cn] }
+    fun cachedLabel(cn: ComponentName): String? = labels.peek(cn)
 
-    fun label(context: Context, cn: ComponentName): String {
-        synchronized(labels) { labels[cn]?.let { return it } }
-        val resolved = runCatching {
+    fun label(context: Context, cn: ComponentName): String = labels.get(cn) {
+        runCatching {
             context.packageManager.getActivityInfo(cn, 0).loadLabel(context.packageManager).toString()
         }.getOrDefault(cn.packageName)
-        synchronized(labels) { labels[cn] = resolved }
-        return resolved
-    }
+    } ?: cn.packageName
 
     /** [icon] if it's been drawn already: cheap enough to call while composing. */
-    fun cachedIcon(cn: ComponentName, px: Int, mono: Boolean): Bitmap? = synchronized(icons) { icons["${cn.flattenToShortString()}/$px/$mono"] }
+    fun cachedIcon(cn: ComponentName, px: Int, mono: Boolean): Bitmap? = icons.peek(iconKey(cn, px, mono))
 
-    /** The app's icon; [mono] uses the themed (monochrome) layer when the app has one. */
-    fun icon(context: Context, cn: ComponentName, px: Int, mono: Boolean): Bitmap? = synchronized(icons) {
-        val key = "${cn.flattenToShortString()}/$px/$mono"
-        icons[key] ?: runCatching {
+    private fun iconKey(cn: ComponentName, px: Int, mono: Boolean) = "${cn.flattenToShortString()}/$px/$mono"
+
+    /** The app's icon; [mono] uses the themed (monochrome) layer when the app has one. Read and drawn outside the cache's lock, which the main thread reads under. */
+    fun icon(context: Context, cn: ComponentName, px: Int, mono: Boolean): Bitmap? = icons.get(iconKey(cn, px, mono)) {
+        runCatching {
             val d: Drawable = context.packageManager.getActivityIcon(cn)
             val drawable = if (mono && d is AdaptiveIconDrawable && d.monochrome != null) d.monochrome!! else d
             val b = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
@@ -277,7 +305,7 @@ object Apps {
             } else drawable.setBounds(0, 0, px, px)
             drawable.draw(Canvas(b))
             b
-        }.getOrNull()?.also { icons[key] = it }
+        }.getOrNull()
     }
 
     fun launch(cn: ComponentName) = Env.launch(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(cn))
@@ -321,9 +349,25 @@ object AppItem : ItemType("app", R.string.item_app_title, Sym.ROCKET_LAUNCH, R.s
     private data class Key(val cn: ComponentName, val mono: Boolean)
     private data class Resolved(val label: String, val icon: Bitmap?)
 
-    /** Label and icon are resolved off the main thread, so a cold cache never stalls a status-bar tick. */
-    private val resolved = Background.refresher<Key, Resolved>(type, every = { _, _ -> null }) { key, _ ->
+    /** How long what was read of an app stays fresh: a change while the bar was away has no one to hear of it. */
+    private const val RELOAD_MS = 60 * 60_000L
+
+    /** Label and icon are resolved off the main thread, so a cold cache never stalls a status-bar tick. A reload reads the app again, not what is kept of it. */
+    private val resolved = Background.refresher<Key, Resolved>(type, every = { _, _ -> RELOAD_MS }) { key, last ->
+        if (last != null) Apps.forget(key.cn.packageName)
         Resolved(Apps.label(Env.app, key.cn), Apps.icon(Env.app, key.cn, 64, key.mono))
+    }
+
+    override fun onLive() = Apps.watch(type)
+    override fun onIdle() = Apps.unwatch(type)
+
+    /** [pkg] changed: an item of it reads it again, and shows what it had until that is done. */
+    fun packageChanged(pkg: String) {
+        Store.config.value.items.filter { it.type == type }.forEach { item ->
+            val cn = cn(item)?.takeIf { it.packageName == pkg } ?: return@forEach
+            val key = Key(cn, mono.of(item))
+            if (resolved.peek(key) != null) resolved.refresh(key)
+        }
     }
 
     private fun cn(item: ItemConfig) = item.options["app"]?.let { ComponentName.unflattenFromString(it) }
@@ -357,6 +401,9 @@ object FolderItem : ItemType("folder", R.string.item_folder_title, Sym.GRID_VIEW
     override val group = ItemGroup.TOOLS
     override val menuWidthDp = 340
     private val label = Opt.text("label", 16)
+    // The menu draws what it finds at opening, so a folder's apps only need the caches to be told.
+    override fun onLive() = Apps.watch(type)
+    override fun onIdle() = Apps.unwatch(type)
     override fun state(item: ItemConfig) = ItemState(icon = Sym.GRID_VIEW, text = label.of(item).ifBlank { Env.str(R.string.common_apps) }, desc = Env.str(R.string.item_folder_title))
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host ->
