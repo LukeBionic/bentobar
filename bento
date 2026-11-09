@@ -68,7 +68,7 @@ install() {
 SVC_SHORT="$PKG/.bar.BarService"
 others() { # the enabled list without BentoBar, colon-separated
   A shell settings get --user current secure enabled_accessibility_services | tr -d '\r' | tr ':' '\n' |
-    grep -v -x -F -e "$SVC" -e "$SVC_SHORT" -e null | grep -v '^$' | paste -sd: || true
+    grep -v -x -F -e "$SVC" -e "$SVC_SHORT" -e null | grep -v '^$' | paste -sd: - || true # BSD paste needs the -: without it the list came back empty on a Mac, and enable wrote over it
 }
 enable() {
   local rest; rest=$(others)
