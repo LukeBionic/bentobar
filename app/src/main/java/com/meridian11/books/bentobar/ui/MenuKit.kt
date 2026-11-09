@@ -1,5 +1,6 @@
 package com.meridian11.books.bentobar.ui
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -55,6 +56,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -81,9 +83,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.meridian11.books.bentobar.R
 import com.meridian11.books.bentobar.items.Env
+import com.meridian11.books.bentobar.items.Failure
+import com.meridian11.books.bentobar.util.Dates
 import com.meridian11.books.bentobar.util.Sym
 import com.meridian11.books.bentobar.util.SymIcon
 import kotlinx.coroutines.delay
+import java.time.ZoneId
 
 /** The frame every drop-down menu shares: a header with icon and title, then content. */
 @Composable
@@ -141,6 +146,17 @@ fun InfoRow(label: String, value: String, valueColor: Color = MaterialTheme.colo
 @Composable
 fun MenuNote(text: String) = Text(text, style = MaterialTheme.typography.bodySmall,
     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 2.dp))
+
+/** "updated 2:40 PM", or what the last try came to beside that time: the end of an online item's menu. In the device's own time, as the system writes it. */
+@Composable
+fun updatedNote(fetchedAt: Long, failure: Failure?): String {
+    val clock = Dates.format(Dates.timeSkeleton(DateFormat.is24HourFormat(LocalContext.current)), fetchedAt, ZoneId.systemDefault())
+    return stringResource(when (failure) {
+        null -> R.string.common_updated
+        Failure.OFFLINE -> R.string.common_updated_offline
+        else -> R.string.common_updated_no_answer
+    }, clock)
+}
 
 /** The line under a search field ("Searching…", "Nothing found"): read out when it changes, without taking the focus. */
 @Composable

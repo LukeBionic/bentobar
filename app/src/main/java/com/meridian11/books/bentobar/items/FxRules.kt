@@ -3,14 +3,15 @@ package com.meridian11.books.bentobar.items
 import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.util.Sym
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 import java.time.LocalDate
 import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.math.abs
@@ -23,12 +24,16 @@ import kotlin.math.abs
 object FxRules {
     const val FRESH_MS = 60 * 60_000L
     const val MENU_MS = 15 * 60_000L
+    /** After no answer. */
     const val RETRY_MS = 15 * 60_000L
+    /** After being told to slow down, unless the service named a longer time. */
+    const val SLOW_MS = 60 * 60_000L
     const val BAR_CHARS = 20
     const val MOST_PAIRS = 6
     const val TURN_SEC = 5
     val TURNS = listOf(3, 5, 10, 30, 60)
 
+    // What can be added, by what the central bank publishes. One it stops publishing (BGN, 2026) stays here: a layout that follows it keeps the pair, and the item says the rate is missing ([missing]).
     val CURRENCIES: Set<String> = setOf(
         "EUR", "USD", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "HKD", "SGD",
         "SEK", "NOK", "DKK", "KRW", "INR", "MXN", "BRL", "ZAR", "PLN", "CZK", "HUF",
@@ -49,6 +54,10 @@ object FxRules {
         val date: String = "",
         val fetchedAt: Long = 0,
         val failure: Failure? = null,
+        /** How many tries in a row went out and failed. */
+        val misses: Int = 0,
+        /** How long the service asked to be left alone. */
+        val retryAfterSec: Long = 0,
     ) {
         val hasRates: Boolean get() = latest.size > 1
         override fun toString() = "FxTable(hasRates=$hasRates, failure=$failure)"
@@ -118,41 +127,38 @@ object FxRules {
         Instant.ofEpochMilli(nowMs).atZone(ZoneOffset.UTC).toLocalDate().minusDays(10).toString()
 
     /**
-     * Parses either Frankfurter's time-series reply (`/v1/2026-10-05..`, where `rates` is keyed by date)
-     * or its single-day reply (`/v1/latest`, where `rates` maps currency codes to numbers).
+     * Frankfurter's `/v2/rates` reply: a list with one row per currency and day (`date`, `base`, `quote`, `rate`), in no
+     * order this relies on. The newest date gives the latest rates and the one before it the day's move. Null for
+     * anything that is no such list: an error's body, a sign-in page, half a reply. A row that makes no sense is left out.
      */
     fun read(jsonText: String, now: Long): FxTable? = try {
-        val root = Json.parseToJsonElement(jsonText).jsonObject
-        val base = root["base"]?.jsonPrimitive?.content ?: "EUR"
-        val ratesObj = root["rates"] as? JsonObject ?: return null
-        val firstVal = ratesObj.values.firstOrNull()
-        if (firstVal is JsonObject) {
-            val dates = ratesObj.keys.sorted()
-            if (dates.isEmpty()) null else {
-                val latestDate = dates.last()
-                val prevDate = if (dates.size >= 2) dates[dates.size - 2] else null
-                val latestMap = extractDay(base, ratesObj[latestDate]!!.jsonObject)
-                val prevMap = prevDate?.let { extractDay(base, ratesObj[it]!!.jsonObject) }.orEmpty()
-                if (latestMap.size <= 1) null else FxTable(latestMap, prevMap, latestDate, fetchedAt = now)
+        val rows = Json.parseToJsonElement(jsonText) as? JsonArray
+        if (rows == null) null else {
+            val days = HashMap<String, HashMap<String, Double>>()
+            var base = "EUR"
+            for (r in rows) {
+                val o = r as? JsonObject ?: continue
+                val date = (o["date"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { DATE.matches(it) } ?: continue
+                val quote = (o["quote"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: continue
+                val rate = (o["rate"] as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull?.takeIf { it > 0.0 && it.isFinite() } ?: continue
+                (o["base"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { base = it }
+                days.getOrPut(date) { HashMap() }[quote] = rate
             }
-        } else {
-            val date = root["date"]?.jsonPrimitive?.content.orEmpty()
-            val latestMap = extractDay(base, ratesObj)
-            if (latestMap.size <= 1) null else FxTable(latestMap, emptyMap(), date, fetchedAt = now)
+            val dates = days.keys.sorted()
+            val latest = dates.lastOrNull()?.let { days[it] }
+            if (latest == null) null else {
+                val day = HashMap(latest).apply { this[base] = 1.0 }
+                val before = dates.getOrNull(dates.size - 2)?.let { d -> HashMap(days[d]!!).apply { this[base] = 1.0 } }.orEmpty()
+                if (day.size <= 1) null else FxTable(day, before, dates.last(), fetchedAt = now)
+            }
         }
     } catch (e: Exception) {
         null
+    } catch (e: StackOverflowError) {
+        null
     }
 
-    private fun extractDay(base: String, obj: JsonObject): Map<String, Double> {
-        val out = HashMap<String, Double>()
-        out[base] = 1.0
-        for ((k, v) in obj) {
-            val d = v.jsonPrimitive.doubleOrNull
-            if (d != null && d > 0.0 && d.isFinite()) out[k] = d
-        }
-        return out
-    }
+    private val DATE = Regex("""\d{4}-\d{2}-\d{2}""")
 
     // Figures in the device's own way of writing numbers, as Stocks does: a decimal comma where the keyboard offers one.
     fun formatRate(rate: Double, locale: Locale = Locale.getDefault()): String = when {
@@ -189,6 +195,26 @@ object FxRules {
     fun quotesFor(pairs: List<FxPair>, table: FxTable): List<PairQuote> =
         pairs.mapNotNull { quoteFor(it, table) }
 
+    /** The pairs [table] has no rate for (BGN since the European Central Bank stopped publishing it): named by the item, never just left out. */
+    fun missing(pairs: List<FxPair>, table: FxTable): List<FxPair> = pairs.filter { quoteFor(it, table) == null }
+
+    /** The day of [table]'s rates, or null when it has none that can be read. */
+    private fun dateOf(table: FxTable): LocalDate? = runCatching { LocalDate.parse(table.date) }.getOrNull()
+
+    /**
+     * A move counts as news only while its table is from today or yesterday (UTC): the bank publishes once a working day,
+     * so a Friday table is still the latest on Sunday and Monday morning, and its move is not this weekend's. The rate itself stays.
+     */
+    fun bigMove(quotes: List<PairQuote>, table: FxTable, thresholdPct: Double, now: Long): Boolean {
+        val date = dateOf(table) ?: return false
+        val today = Instant.ofEpochMilli(now).atZone(ZoneOffset.UTC).toLocalDate()
+        return !date.isBefore(today.minusDays(1)) && quotes.any { abs(it.changePct) >= thresholdPct }
+    }
+
+    /** The day of [table]'s rates when that isn't today where the device is ([zone]), to go with the numbers; null when it is, or when the table has no date. */
+    fun notToday(table: FxTable, now: Long, zone: ZoneId): LocalDate? =
+        dateOf(table)?.takeIf { it != Instant.ofEpochMilli(now).atZone(zone).toLocalDate() }
+
     /**
      * The amount [raw] says, in the way [locale] writes numbers; null for anything else. Read by hand rather than with
      * NumberFormat, which takes "100,50" for 10050 where a comma groups thousands: a separator counts only where the
@@ -215,9 +241,10 @@ object FxRules {
     /** An amount with its separators made plain: whole, or grouped from the end in threes (twos, further left, in India), with its decimals. */
     private val WRITTEN = Regex("""\d+(\.\d*)?|\.\d+|\d{1,3}(,\d{2,3})*,\d{3}(\.\d*)?""")
 
-    fun every(table: FxTable): Long = if (table.failure != null) RETRY_MS else FRESH_MS
+    /** An hour after a good table; a failure at its own pace, as the other online items. */
+    fun every(table: FxTable): Long = if (table.failure == null) FRESH_MS else Pace.after(table.failure, table.misses, table.retryAfterSec, RETRY_MS, SLOW_MS)
 
-    /** Debug samples (`./bento debug fx stage calm|big|offline`). */
+    /** Debug samples (`./bento debug fx stage calm|big|offline|old`). */
     fun sample(name: String, now: Long): FxTable? = when (name) {
         "calm" -> FxTable(
             latest = mapOf("EUR" to 1.0, "USD" to 1.0942, "JPY" to 163.40, "GBP" to 0.8340, "CHF" to 0.9380, "CAD" to 1.5020),
@@ -237,6 +264,12 @@ object FxRules {
             date = LocalDate.now(ZoneOffset.UTC).toString(),
             fetchedAt = now - 900_000,
             failure = Failure.OFFLINE,
+        )
+        "old" -> FxTable(
+            latest = mapOf("EUR" to 1.0, "USD" to 1.0942, "JPY" to 163.40, "GBP" to 0.8340),
+            previous = mapOf("EUR" to 1.0, "USD" to 1.0812, "JPY" to 162.90, "GBP" to 0.8355),
+            date = LocalDate.now(ZoneOffset.UTC).minusDays(3).toString(),
+            fetchedAt = now - 300_000,
         )
         else -> null
     }

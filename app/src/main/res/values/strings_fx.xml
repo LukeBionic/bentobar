@@ -33,4 +33,9 @@
     <string name="fx_desc_loading">Exchange rates: loading</string>
     <string name="fx_desc_no_rates">Exchange rates: unavailable</string>
     <string name="fx_desc_live">Exchange rates: %1$s</string>
+    <string name="fx_desc_dated">Exchange rates from %2$s: %1$s</string>
+    <string name="fx_desc_missing">Exchange rates: no rate for %1$s</string>
+    <string name="fx_no_rate_for">No rate for %1$s.</string>
+    <string name="fx_no_rate">No rate published</string>
+    <string name="fx_rates_from">Rates from %1$s</string>
 </resources>

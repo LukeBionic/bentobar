@@ -42,6 +42,9 @@ import com.meridian11.books.bentobar.ui.MenuEntry
 import com.meridian11.books.bentobar.ui.MenuNote
 import com.meridian11.books.bentobar.ui.SearchField
 import com.meridian11.books.bentobar.ui.rememberTick
+import com.meridian11.books.bentobar.ui.updatedNote
+import com.meridian11.books.bentobar.util.Dates
+import com.meridian11.books.bentobar.util.Now
 import com.meridian11.books.bentobar.util.Sym
 import com.meridian11.books.bentobar.util.SymIcon
 import java.time.ZoneId
@@ -86,9 +89,12 @@ internal fun FxMenu(item: ItemConfig, host: MenuHost) {
             val quotes = FxRules.quotesFor(pairs, table)
             var amountText by remember { mutableStateOf("100") }
             val amount = FxRules.parseAmount(amountText)
-            MenuCard(Sym.SWAP_VERT, title, table.date.ifEmpty { null }) {
-                quotes.forEach { q ->
-                    FxQuoteRow(q, amount)
+            // The date of rates that are not today's: the bank publishes once a working day, so Friday's are still the latest on Sunday.
+            val old = FxRules.notToday(table, Now.wall(), ZoneId.systemDefault())
+            MenuCard(Sym.SWAP_VERT, title, old?.let { stringResource(R.string.fx_rates_from, Dates.format("MMMd", it)) } ?: table.date.ifEmpty { null }) {
+                pairs.forEach { p ->
+                    val q = quotes.firstOrNull { it.pair == p }
+                    if (q != null) FxQuoteRow(q, amount) else FxMissingRow(p)
                 }
                 Spacer(Modifier.height(4.dp))
                 SearchField(
@@ -99,13 +105,7 @@ internal fun FxMenu(item: ItemConfig, host: MenuHost) {
                     onChange = { amountText = it },
                     onEnter = { amountText = it },
                 )
-                val clock = WeatherItem.times().clock(table.fetchedAt, ZoneId.systemDefault())
-                val updated = when (table.failure) {
-                    Failure.OFFLINE -> stringResource(R.string.common_updated_offline, clock)
-                    null -> stringResource(R.string.common_updated, clock)
-                    else -> stringResource(R.string.common_updated_no_answer, clock)
-                }
-                MenuNote(stringResource(R.string.fx_note, updated))
+                MenuNote(stringResource(R.string.fx_note, updatedNote(table.fetchedAt, table.failure)))
                 MenuDivider()
                 MenuEntry(Sym.REFRESH, stringResource(R.string.common_refresh)) { FxItem.refresh() }
                 MenuEntry(Sym.EDIT, stringResource(R.string.fx_edit)) { host.openItemSettings(item.id) }
@@ -117,6 +117,15 @@ internal fun FxMenu(item: ItemConfig, host: MenuHost) {
                 }
             }
         }
+    }
+}
+
+/** A pair the service sent no rate for: named, with a word why, rather than left out of the list. */
+@Composable
+private fun FxMissingRow(p: FxPair) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(p.code, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.fx_no_rate), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
