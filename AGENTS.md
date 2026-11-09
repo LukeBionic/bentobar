@@ -236,7 +236,9 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   strip again and again): after a dozen readings within a minute a cause's first reading waits two
   seconds behind the last one and what follows it comes four seconds later, where the next cause of
   the stream takes its place. That holds every such stream to one reading in two seconds, which is
-  what 0.9 allowed a stream of windows, and the last cause still gets its readings. The watch is told
+  what 0.9 allowed a stream of windows. A stream that goes on widens the gap again: after a minute of it
+  readings keep ten seconds apart, after five minutes a minute apart, until causes stop for a minute;
+  the last cause still gets its readings. The watch is told
   when a screenshot is asked for, not when its answer comes: a cause in between is not served by a
   screenshot taken before it, and two are never asked for within 400 ms (Android refuses the second).
 - **The window list can end early.** With a dialog on top, or some apps' own windows, the

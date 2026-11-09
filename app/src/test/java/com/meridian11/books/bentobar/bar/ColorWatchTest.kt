@@ -361,6 +361,85 @@ class ColorWatchTest {
         }
     }
 
+    // ---- a stream that goes on: the second tier ---------------------------------------------------------
+
+    /** A cause every [every] ms until [until]; each reading due is asked for and answered at once, through [end]. */
+    private fun stream(until: Long, every: Long, end: Long = until, cause: ColorWatch.(Long) -> Unit): List<Long> {
+        val watch = ColorWatch()
+        val at = ArrayList<Long>()
+        for (t in 0L..end step 100) {
+            if (watch.due(t) == 0L) { at += t; watch.shot(t, Result.SAME) }
+            if (t <= until && t % every == 0L) watch.cause(t)
+        }
+        return at
+    }
+
+    private fun wallpaper(until: Long, end: Long = until) = stream(until, every = 1_000, end) { cause(Cause.QUICK, it, 300) }
+
+    /** Finding F26: a wallpaper that reports its colours every second, for an hour, must not cost 30 screenshots a minute for an hour. */
+    @Test fun aStreamThatGoesOnIsReadLessAndLess() {
+        val at = wallpaper(until = 3_600_000)
+        // The first minute of the stream is the budget as it always was: every two seconds, once a dozen were taken.
+        val first = at.filter { it in 20_000L..60_000L }
+        assertTrue("$first", first.isNotEmpty() && first.zipWithNext().all { (a, b) -> b - a >= BarNeighbours.APART_MS })
+        // A minute in, every ten seconds; five minutes in, once a minute.
+        val tenSeconds = at.filter { it > 90_000 }
+        assertTrue("${tenSeconds.take(20)}", tenSeconds.zipWithNext().all { (a, b) -> b - a >= 10_000 })
+        val minutes = at.filter { it > 330_000 }
+        assertTrue("${minutes.take(20)}", minutes.zipWithNext().all { (a, b) -> b - a >= 60_000 })
+        assertTrue("${minutes.size} readings after the first five minutes", minutes.size <= 56)
+        assertTrue("${at.size} readings in the hour", at.size <= 140)
+    }
+
+    /** "Reading on a change" is the rule: the tier narrows the rate, it never drops the last cause. */
+    @Test fun theLastCauseOfALongStreamIsStillRead() {
+        val at = wallpaper(until = 1_200_000, end = 1_400_000)
+        val after = at.filter { it > 1_200_000 }
+        assertTrue("$after", after.size in 1..2)
+        assertTrue("the last cause is read within the minute's gap: $after", after.first() <= 1_260_000)
+        assertTrue("and its readings keep their distance: $after", after.zipWithNext().all { (a, b) -> b - a >= 60_000 })
+    }
+
+    /** Readings aren't budgeted away from a change of windows or a return either, once a stream ends. */
+    @Test fun aStreamThatStopsIsForgotten() {
+        val watch = ColorWatch()
+        for (t in 0L..400_000L step 1_000) { if (watch.due(t) == 0L) watch.shot(t, Result.SAME); watch.cause(Cause.QUICK, t, 300) }
+        // Readings owed by the stream's last cause are taken within its gap.
+        var t = 400_000L
+        while (watch.due(t) != null) { t += watch.due(t)!!; watch.shot(t, Result.SAME) }
+        // A minute with no cause: the next one is read like any other.
+        val next = t + 61_000
+        watch.cause(Cause.QUICK, next, 300)
+        assertEquals(300L, watch.due(next))
+        assertEquals(listOf(next + 300, next + 1_300), Strip("a", watch).also { it.now = next }.follow(until = next + 5_000) { "a" }.at)
+    }
+
+    /** A stream's window changes keep the two-second rule until it has lasted; only then does the gap widen. */
+    @Test fun aWindowStreamWidensLikeAnyOther() {
+        val at = stream(until = 600_000, every = 2_000, end = 700_000) { windowsMoved(it) }
+        assertTrue("${at.filter { it > 90_000 }.take(20)}", at.filter { it > 90_000 }.zipWithNext().all { (a, b) -> b - a >= 10_000 })
+        assertTrue("the last change is read after it stopped", at.any { it > 600_000 })
+    }
+
+    /** Whatever the tier: two screenshots are never asked for within 400 ms. */
+    @Test fun theLongStreamKeepsTheDistanceWhateverHappens() {
+        for (seed in 1L..5L) {
+            val random = java.util.Random(seed)
+            val watch = ColorWatch()
+            val asked = ArrayList<Long>()
+            for (t in 0L..1_500_000L step 20) {
+                if (watch.due(t) == 0L) { watch.taken(t); asked += t; watch.read(t, Result.values()[random.nextInt(3)]) }
+                when (random.nextInt(50)) { // something about every second
+                    0 -> watch.windowsMoved(t)
+                    1 -> watch.cause(Cause.QUICK, t, 100L + random.nextInt(5) * 100)
+                    2 -> if (random.nextInt(10) == 0) watch.cause(Cause.SLOW, t, 250)
+                    3 -> if (random.nextInt(40) == 0) watch.clear()
+                }
+            }
+            assertTrue("seed $seed", asked.zipWithNext().all { (a, b) -> b - a >= 400 })
+        }
+    }
+
     private companion object { const val HINTS = "hints" }
 
     @Test fun aStripWithNothingToDrawReadsNothingAndCatchesUpWhenItHasSomething() {
