@@ -37,7 +37,6 @@ import com.meridian11.books.bentobar.data.Pill
 import com.meridian11.books.bentobar.data.Position
 import com.meridian11.books.bentobar.data.Section
 import com.meridian11.books.bentobar.data.Store
-import com.meridian11.books.bentobar.items.Caffeine
 import com.meridian11.books.bentobar.items.Chips
 import com.meridian11.books.bentobar.items.DisplaysItem
 import com.meridian11.books.bentobar.items.Env
@@ -144,6 +143,9 @@ class BarController(private val service: AccessibilityService) {
 
     private val strip = Overlay(service, "BentoBar", onOutside = { outsideClick() }).apply { params.width = 1; watchOutside(false) }
 
+    /** Keep awake: a flag on the strip's window, a wake lock while the strip has none to carry it. */
+    private val awake = KeepAwake(main, pm, km, scope, strip) { stripEmpty }
+
     /** A click outside the strip while hidden items are out folds them away, unless a menu is open (it closes itself). */
     private fun outsideClick() {
         if (menuKey != null || !expanded.value) return
@@ -208,12 +210,11 @@ class BarController(private val service: AccessibilityService) {
     }
     /** A pointer holds an item's slider: between its first report and the one that says `done`. */
     private var sliding = false
-    private val awakeExpiry = Runnable { Caffeine.check() }
 
     private val screen = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             if (i.action == Intent.ACTION_SCREEN_OFF) closeMenu(now = true)
-            updateAwake()
+            awake.update()
             main.post(scanNow)
             if (i.action == Intent.ACTION_SCREEN_ON) {
                 main.removeCallbacks(poll); main.postDelayed(poll, 2_000)
@@ -231,14 +232,7 @@ class BarController(private val service: AccessibilityService) {
         })
         colors.start()
         scope.launch { Store.config.collect { onConfig() } }
-        scope.launch {
-            Caffeine.until.collect { until ->
-                updateAwake()
-                main.removeCallbacks(awakeExpiry)
-                if (until != 0L && until != Caffeine.FOREVER) main.postDelayed(awakeExpiry, (until - System.currentTimeMillis()).coerceAtLeast(0) + 200)
-            }
-        }
-        scope.launch { DisplaysItem.keepingAwake.collect { updateAwake() } }
+        awake.start()
         scan()
         main.postDelayed(poll, 2_000)
     }
@@ -257,7 +251,7 @@ class BarController(private val service: AccessibilityService) {
         Ticker.revealHidden = false
         main.removeCallbacksAndMessages(null) // after closeMenu, which posts a collapse
         strip.destroy()
-        if (screenLock.isHeld) screenLock.release()
+        awake.stop()
         DisplaysItem.follow(false)
         Ticker.stop("bar")
         scope.cancel()
@@ -366,7 +360,7 @@ class BarController(private val service: AccessibilityService) {
             strip.hide()
             // Readings still to come were for a strip that is gone: its return asks again.
             colors.stripLeft()
-            updateAwake()
+            awake.update()
             Ticker.stop("bar")
         }
     }
@@ -405,7 +399,7 @@ class BarController(private val service: AccessibilityService) {
             // Android refused the window (the service is going): nothing is on screen, so nothing may run or go online.
             // The next look at the bar tries again.
             if (!strip.shown) { BarStatus.current.value = BarStatus.STOPPED; return }
-            updateAwake()
+            awake.update()
             // Back on screen (after a full-screen app, the lock screen, a covering panel): the bar may
             // look different now, or only in a while (after an unlock it kept the lock screen's look for
             // seconds), and a reading owed while hidden is taken here.
@@ -473,7 +467,7 @@ class BarController(private val service: AccessibilityService) {
     private fun applyWidth(w: Int) {
         val empty = w <= 0
         if (empty != stripEmpty) {
-            stripEmpty = empty; strip.setContentVisible(!empty); trace("strip ${if (empty) "empty" else "has content"}"); updateAwake()
+            stripEmpty = empty; strip.setContentVisible(!empty); trace("strip ${if (empty) "empty" else "has content"}"); awake.update()
             colors.contentChanged(empty)
         }
         val width = w.coerceAtLeast(1)
@@ -780,38 +774,6 @@ class BarController(private val service: AccessibilityService) {
         Ticker.stop("menu")
         if (!hovering && !pinned) { main.removeCallbacks(collapse); main.postDelayed(collapse, 600) }
     }
-
-    // ---- keep awake --------------------------------------------------------------------------
-
-    /**
-     * Keep awake holds the screen on through the strip's own window (FLAG_KEEP_SCREEN_ON on a
-     * window that's visible), not a window of its own. It used to be a separate 1×1 see-through
-     * overlay: Play Protect's live threat detection flags an accessibility service that keeps
-     * "imperceptible content" on screen ("App displays over other apps"). The catch: while the strip
-     * is hidden (a full-screen app, the screen locked), keep awake waits; full-screen video players
-     * keep the screen on themselves.
-     */
-    private fun updateAwake() {
-        val on = Caffeine.active() || DisplaysItem.keepingAwake.value
-        val f = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-        val flags = if (on) strip.params.flags or f else strip.params.flags and f.inv()
-        if (flags != strip.params.flags) {
-            strip.params.flags = flags
-            strip.relayout()
-            Log.i(tag, if (on) "keep awake on" else "keep awake off")
-        }
-        // While the strip is hidden (a full-screen app, BentoBar hidden from its tile) or has nothing
-        // to draw, no visible window of ours carries the flag: a screen wake lock holds it instead,
-        // with no window. Released when the strip is back, keep awake ends, the screen goes off (the
-        // power key or the lid) or the lock screen is up.
-        val lock = on && (!strip.shown || stripEmpty) && pm.isInteractive && !km.isKeyguardLocked
-        if (lock && !screenLock.isHeld) { screenLock.acquire(); Log.i(tag, "keep awake: wake lock while the bar is hidden") }
-        else if (!lock && screenLock.isHeld) screenLock.release()
-    }
-
-    /** See [updateAwake]. Deprecated in favor of FLAG_KEEP_SCREEN_ON, which needs a visible window. */
-    @Suppress("DEPRECATION")
-    private val screenLock = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "BentoBar:keepAwake").apply { setReferenceCounted(false) }
 
     // ---- tests (adb only) --------------------------------------------------------------------
 

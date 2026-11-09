@@ -20,7 +20,7 @@ class HidePathTest {
     @Test fun theBarHidesInItsOneOrderAndLetsGoOfThePointerBeforeTheWindowGoes() {
         var at = 0
         for (step in listOf("closeMenu(now = true)", "hideTip()", "cancelDrag()", "hovering = false", "main.removeCallbacks(expandOnHover)",
-            "strip.hide()", "colors.stripLeft()", "updateAwake()", "Ticker.stop(\"bar\")")) {
+            "strip.hide()", "colors.stripLeft()", "awake.update()", "Ticker.stop(\"bar\")")) {
             val i = hide.indexOf(step, at)
             assertTrue("$step is missing, or out of order, in the hide path", i >= 0)
             at = i + step.length
