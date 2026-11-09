@@ -38,7 +38,7 @@ jobs:
       # The heap comes from gradle.properties. There is no keystore on this runner, so assembleRelease builds unsigned
       # (app/build.gradle.kts signs only when ~/.config/bentobar holds a key); a real release is signed by release.yml.
       - name: Tests, lint and release build
-        run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --no-daemon --console=plain
+        run: ./gradlew :app:testDebugUnitTest :app:testComposeTestUnitTest :app:lintDebug :app:assembleRelease --no-daemon --console=plain
 
       - name: Reports
         if: failure()

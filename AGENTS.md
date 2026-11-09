@@ -58,6 +58,9 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     neither a click nor a drag). Its arithmetic and the rules of a press (`SliderGesture`: a click, a
     drag, a finger's tap, swipe and long hold, a press that is taken away) are in `bar/SliderMath.kt`,
     pure and unit-tested; change the rules there, not in the pointer loop.
+    A press on an item is `bar/ClickGesture.kt`, pure and unit-tested like `SliderGesture` (a click, the menu when a finger
+    holds still for the system's long-press time, a drag, what the system takes away). The strip's order is forced left to
+    right in every language (`Strip`); only inside an item does the real direction hold; `StripDrag` says where a drag lands.
     The route line an item can have in its icon's place is the same line with a plane on it and no
     pointer (`ItemState.route`: `RouteTrack` draws it, `SliderMath.route` says where its parts stand,
     `StripLook.route` what color they take). The Flight item has one from its countdown until an hour
@@ -139,6 +142,8 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   - `util/`: `Sym.kt` (generated), `Ui.kt` (fonts, `SymIcon`), `Fmt.kt`, `Dates.kt` (locale-aware dates
     and times from skeletons), `Now.kt` (the clock for ages and countdowns, which a debug build's
     test hook can move), `Units.kt` (temperatures in the user's unit), `DebugReceiver.kt`.
+- Text sizes in the strip follow one rule: words in sp, what is drawn around them (symbols, app icons, the date badge and its digits) in
+  dp, as the system bar's are (`StripLook.iconDp`).
 - Text: every user-facing string is a resource. `res/values/strings.xml` is US English (the default);
   `res/values-en-rGB/strings.xml` holds only the strings whose British spelling differs. Item titles and
   blurbs are `@StringRes` ids on `ItemType`; non-Compose code uses `Env.str`/`Env.plural`. Counts use
@@ -146,7 +151,8 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   A newer feature's text is in a file of its own, `res/values/strings_<feature>.xml`, where every name
   starts with `<feature>_`, `item_<feature>_` or `trigger_<feature>`; its British spellings go in
   `values-en-rGB/strings_<feature>.xml` with identical copies in en-rAU, en-rNZ, en-rIE, en-rIN and
-  en-rZA. `LocaleCopiesTest` checks every `strings*.xml`.
+  en-rZA. `LocaleCopiesTest` checks every `strings*.xml`. `Fmt`'s percentages, units and spoken lengths of time go through `Fmt.words`,
+  set from the text resources in `Env.init`.
 - `tools/logo.py`: draws the icon (a bento box seen from above: a status bar compartment with a ‹
   and dots cut out, over three item compartments; rice, salmon, tamago and edamame on ink blue):
   launcher foreground/monochrome/background, `ic_bentobar` (24 dp, app header, ‹ menu) and
@@ -164,9 +170,12 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
 - `probe/`: the throwaway feasibility probe (Gradle-free build). Not part of the app.
 
 ## Before a PR
-- Run `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleRelease` (CI's `check` runs exactly this on
-  every pull request, with no signing key). Lint errors fail it: fix them, or suppress one in code with the reason
+- Run `./gradlew :app:testDebugUnitTest :app:testComposeTestUnitTest :app:lintDebug :app:assembleRelease` (CI's `check` runs
+  exactly this on every pull request, with no signing key). Lint errors fail it: fix them, or suppress one in code with the reason
   beside it. A known error goes into `app/lint-baseline.xml` only with a note saying who removes it.
+- The Compose tests live in `app/src/testComposeTest` under the `composeTest` build type (`:app:testComposeTestUnitTest`), so
+  Robolectric stays out of the fast tests in `app/src/test`. `MenuCompositionTest` composes every registered item's menu under
+  each state in its type's `stages`; Compose has no error boundary, so this is what stands between a throwing menu and the service.
 - Editing the manifest or a string re-runs the tests that read them; a green run that says UP-TO-DATE after such an
   edit is wrong, so look.
 - Anything only hardware shows (colours after an unlock, full screen, the empty strip, Play Protect) is on the device
