@@ -174,6 +174,8 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
      * `weather fail error|slow-down|offline`, `weather off`, and `weather` alone for where things
      * stand. What it answers is logged, so it names no city and no coordinates.
      */
+    override val stages = WeatherSamples.names.map { "stage $it" } + listOf("places", "none", "offline", "error", "busy").map { "search $it" }
+
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> {
             val items = Store.config.value.items.filter { it.type == type }

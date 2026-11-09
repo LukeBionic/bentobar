@@ -243,6 +243,12 @@ abstract class ItemType(
      */
     open fun debug(args: List<String>): String? = null
 
+    /**
+     * What [debug] can stage, each as the words that follow the type's name (`stage rain-soon`). The test that composes every
+     * item's menu goes through these under the registered types, so a staged state is covered by being named here; `off` ends it.
+     */
+    open val stages: List<String> = emptyList()
+
     /** The drop-down menu. Null means the type has none (clicks go to [onClick]). */
     open val menu: (@Composable (item: ItemConfig, host: MenuHost) -> Unit)? = null
 

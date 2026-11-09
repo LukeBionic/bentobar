@@ -167,6 +167,8 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
      * and `stocks` alone for where things stand. Staged quotes are for the symbols of the first Stocks
      * item, made up from its own symbols, so a test sets the stocks first (`set ID stocks=…`).
      */
+    override val stages = listOf("up", "down", "mixed", "big", "closed", "loading", "offline", "refused", "nokey", "none").map { "stage $it" }
+
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> {
             val items = Store.config.value.items.filter { it.type == type }

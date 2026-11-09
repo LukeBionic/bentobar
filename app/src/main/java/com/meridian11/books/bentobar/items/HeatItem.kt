@@ -116,5 +116,7 @@ object HeatItem : ItemType("heat", R.string.item_heat_title, Sym.DEVICE_THERMOST
             "c" to stringResource(R.string.option_celsius), "f" to stringResource(R.string.option_fahrenheit)), HeatRules.unit(item)) { set(item.with("unit", it)) }
     }
 
+    override val stages = (HeatRules.NONE..HeatRules.SHUTDOWN).map { "stage $it" } + listOf("level 0.84", "level none", "temp 41.3")
+
     override fun debug(args: List<String>): String? = Heat.debug(args)
 }

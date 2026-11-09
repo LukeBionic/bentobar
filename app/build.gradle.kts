@@ -42,6 +42,9 @@ android {
         // `-PreleaseSignedDebug`: a debug build signed with the release key, so it installs over a released BentoBar on
         // a test device and keeps its layout and its accessibility switch (same id, same key, same version code).
         if (project.hasProperty("releaseSignedDebug")) debug { signingConfig = signingConfigs.getByName("release") }
+        // Only for the Compose tests in src/testComposeTest (`:app:testComposeTestUnitTest`): a build type gives them a source
+        // set and dependencies of their own, so Robolectric and the test activity's manifest stay out of the fast tests and the APKs.
+        create("composeTest") { initWith(getByName("debug")) }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -76,6 +79,33 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation("junit:junit:4.13.2")
+    // The Compose tests alone (see the build type): Robolectric hosts the composables on the JVM, ui-test drives them, and
+    // ui-test-manifest declares the empty activity they are set into.
+    add("testComposeTestImplementation", platform(libs.androidx.compose.bom))
+    add("testComposeTestImplementation", libs.androidx.compose.ui.test.junit4)
+    add("testComposeTestImplementation", libs.robolectric)
+    // ui-test brings 3.5, which calls a method Android 17 no longer has.
+    add("testComposeTestImplementation", libs.androidx.test.espresso.core)
+    add("composeTestImplementation", libs.androidx.compose.ui.test.manifest)
+}
+
+androidComponents {
+    // Host tests are on for the tested build type alone, unless asked for. Robolectric reads the merged resources, and only
+    // this variant's tests get them: the fast tests stay resource-free.
+    beforeVariants(selector().withBuildType("composeTest")) { variant ->
+        variant.hostTests[com.android.build.api.variant.HostTestBuilder.UNIT_TEST_TYPE]?.let {
+            it.enable = true
+            it.includeAndroidResources = true
+        }
+    }
+    // src/test belongs to every variant's tests, so this variant compiles it too. Only the Compose tests run here.
+    onVariants(selector().withBuildType("composeTest")) { variant ->
+        variant.hostTests[com.android.build.api.variant.HostTestBuilder.UNIT_TEST_TYPE]?.configureTestTask {
+            it.filter.includeTestsMatching("com.meridian11.books.bentobar.compose.*")
+            // Robolectric's Android 17 reaches this JDK-internal class, which isn't exported by default.
+            it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED", "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED")
+        }
+    }
 }
 
 // Tests read src/main/res and the manifest by path (ManifestTest, LocaleCopiesTest and others). Gradle does not know

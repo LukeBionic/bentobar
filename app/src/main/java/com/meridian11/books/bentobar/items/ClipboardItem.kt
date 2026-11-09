@@ -217,6 +217,8 @@ object ClipboardItem : ItemType("clipboard", R.string.item_clipboard_title, Sym.
         }
     }
 
+    override val stages = listOf("stage sample", "stage empty")
+
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> "staged=${staged != null} recent=${recent.value.size}"
         "stage" -> when (args.getOrNull(1)) {

@@ -568,14 +568,8 @@ class BarController(private val service: AccessibilityService) {
             }
             val from = dragFrom?.second
             val cfg = Store.config.value
-            val index = if (item.section != Section.SHOWN || from == null) null else {
-                val center = from.exactCenterX() + dx
-                val overflow = BarOverflow.ids.value
-                val others = cfg.items.filter { it.section == Section.SHOWN && it.id != item.id }
-                val drawn = others.filter { it.id !in overflow && dragCenters.containsKey(it.id) }
-                val after = drawn.firstOrNull { dragCenters.getValue(it.id) > center }
-                if (after == null) others.size else others.indexOfFirst { it.id == after.id }
-            }
+            val index = if (item.section != Section.SHOWN || from == null) null
+                else StripDrag.index(from.exactCenterX() + dx, cfg.items.filter { it.section == Section.SHOWN && it.id != item.id }.map { it.id }, BarOverflow.ids.value, dragCenters)
             if (!done) {
                 if (index != null && dragPreview.value != (item.id to index)) dragPreview.value = item.id to index
                 return
@@ -584,6 +578,8 @@ class BarController(private val service: AccessibilityService) {
             if (index != null) Store.move(item.id, Section.SHOWN, index)
             cancelDrag()
         }
+
+        override fun dragTakenAway(item: ItemConfig) { if (dragFrom?.first == item.id) cancelDrag() }
 
         override fun gapClick(key: String) {
             val at = placed[key] ?: return

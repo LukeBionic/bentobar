@@ -213,6 +213,8 @@ object DisplaysItem : ItemType("displays", R.string.item_displays_title, Sym.DES
         }
     }
 
+    override val stages = listOf("stage 4k", "stage dual", "stage none")
+
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> "staged=${staged != null} screens=${currentScreens().size} external=${currentScreens().count { !it.builtIn }} awake=${keepingAwake.value}"
         "stage" -> {

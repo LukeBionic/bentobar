@@ -93,7 +93,7 @@ object SliderMath {
  *
  * A mouse, a touchpad or a stylus follows from the press on. A finger first has to say what it is
  * about: a tap sets the level when it lifts, a move past the touch slop makes the level follow, a
- * long hold asks for the item's menu. A click or a tap never sets nothing at all (its lowest level
+ * long hold asks for the item's menu when it is that long ([held]). A click or a tap never sets nothing at all (its lowest level
  * is one step): only a pointer that has really moved to another level can, so a click that
  * trembles at the track's start is still a click.
  */
@@ -112,6 +112,8 @@ class SliderGesture(private val steps: Int) {
     var down = false; private set
     /** The level follows the pointer. */
     var following = false; private set
+    /** A finger is down that has not said yet what it is about: a hold is being waited for. */
+    val holding: Boolean get() = down && !following
     private var moved = false
     /** The level under the pointer when it was last looked at, on its step; NaN: not looked at yet. */
     private var under = Float.NaN
@@ -144,10 +146,9 @@ class SliderGesture(private val steps: Int) {
     }
 
     /**
-     * The pointer let go over [level]. [inside]: it is still on the slider; [longHold]: it was down
-     * for as long as a long press takes. Both only matter for a finger that never followed.
+     * The pointer let go over [level]. [inside]: it is still on the slider; it only matters for a finger that never followed.
      */
-    fun release(level: Float, inside: Boolean, longHold: Boolean): End {
+    fun release(level: Float, inside: Boolean): End {
         if (!down) return End.None
         val followed = following
         down = false; following = false
@@ -155,9 +156,15 @@ class SliderGesture(private val steps: Int) {
             // A drag ends where it is let go; a click ends on the level it set when the button went down.
             followed -> if (moved || said.isNaN()) End.Level(SliderMath.snap(level, steps)) else End.Level(said)
             !inside -> End.None
-            longHold -> End.Menu
             else -> End.Level(SliderMath.atLeastOneStep(level, steps))
         }
+    }
+
+    /** A finger stayed down for the system's long-press time without saying more: the item's menu, now, and the press is over. Nothing is set. */
+    fun held(): End {
+        if (!holding) return End.None
+        down = false
+        return End.Menu
     }
 
     /**

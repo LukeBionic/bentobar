@@ -499,6 +499,8 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
      * followed. A sample is a made-up flight. Of the real thing nothing is printed but whether there is
      * a key and a switch: never the key, and never a number the user entered.
      */
+    override val stages get() = FlightSamples.stages
+
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> "items=${ids().size} key=${Online.hasKey(online)} on=${Online.on(online)} staged=" + (staged?.let { "${stagedAs.orEmpty()}: ${reads(it)}" } ?: "nothing")
         "off" -> { unstage(); "the real thing again" }

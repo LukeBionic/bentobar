@@ -117,6 +117,8 @@ object FxItem : ItemType("fx", R.string.item_fx_title, Sym.SWAP_VERT, R.string.i
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host -> FxMenu(item, host) }
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set -> FxOptions(item, set) }
 
+    override val stages = listOf("calm", "big", "offline", "old").map { "stage $it" }
+
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> "staged=${staged.value != null} on=${Online.on(online)}"
         "stage" -> {

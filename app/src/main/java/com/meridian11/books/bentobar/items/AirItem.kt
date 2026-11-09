@@ -148,6 +148,8 @@ object AirItem : ItemType("air", R.string.item_air_title, Sym.AIR, R.string.item
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host -> AirMenu(item, host) }
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set -> AirOptions(item, set) }
 
+    override val stages = listOf("good", "moderate", "smoke", "highuv", "offline").map { "stage $it" }
+
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> "staged=${staged.value != null} on=${Online.on(online)}"
         "stage" -> {
