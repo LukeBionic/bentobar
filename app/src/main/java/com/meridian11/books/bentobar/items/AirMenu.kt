@@ -37,6 +37,7 @@ import com.meridian11.books.bentobar.ui.MenuCard
 import com.meridian11.books.bentobar.ui.MenuDivider
 import com.meridian11.books.bentobar.ui.MenuEntry
 import com.meridian11.books.bentobar.ui.MenuNote
+import com.meridian11.books.bentobar.ui.OffGate
 import com.meridian11.books.bentobar.ui.Setup
 import com.meridian11.books.bentobar.ui.rememberTick
 import com.meridian11.books.bentobar.ui.updatedNote
@@ -102,10 +103,8 @@ internal fun AirMenu(item: ItemConfig, host: MenuHost) {
             if (!here) useHere() else useCity()
             MenuEntry(Sym.CLOSE, stringResource(R.string.common_cancel)) { source.typed(by); changing = false }
         }
-        status is Status.Off -> MenuCard(Sym.AIR, city, stringResource(if (Online.setUp(Online.Service.OPEN_METEO)) R.string.common_off_in_setup else R.string.weather_not_turned_on)) {
-            MenuNote(stringResource(R.string.weather_consent))
-            MenuEntry(Sym.TOGGLE_ON, stringResource(R.string.weather_turn_on)) { Online.turnOn(Online.Service.OPEN_METEO); Ticker.refresh(AirItem.type) }
-        }
+        status is Status.Off -> OffGate(Sym.AIR, city, stringResource(if (status.everOn) R.string.common_off_in_setup else R.string.weather_not_turned_on),
+            stringResource(R.string.weather_consent), stringResource(R.string.weather_turn_on)) { Online.turnOn(Online.Service.OPEN_METEO); Ticker.refresh(AirItem.type) }
         status is Status.NoLocation -> {
             val why = status.why
             MenuCard(Sym.AIR, city, stringResource(when (why) {

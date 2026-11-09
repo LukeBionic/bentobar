@@ -593,6 +593,11 @@
         <item quantity="one">%1$d character</item>
         <item quantity="other">%1$d characters</item>
     </plurals>
+    <!-- A choice of how long each value shows in the bar: "3 s", "10 s". -->
+    <plurals name="common_seconds_short">
+        <item quantity="one">%1$d s</item>
+        <item quantity="other">%1$d s</item>
+    </plurals>
     <plurals name="common_minutes_short">
         <item quantity="one">%1$d min</item>
         <item quantity="other">%1$d min</item>

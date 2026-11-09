@@ -31,6 +31,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -77,6 +78,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -356,6 +358,71 @@ fun SearchField(label: String, placeholder: String = "", initial: String = "", s
         if (error != null) Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
             modifier = Modifier.padding(start = 4.dp, top = 2.dp))
     }
+}
+
+/**
+ * The card of an online item whose service is switched off: what it is ([title]) and why ([subtitle]), the service's own
+ * words on what going online means ([consent]), and the way back on ([turnOn]). Each service's not-set-up card stays its own.
+ */
+@Composable
+fun OffGate(icon: String, title: String, subtitle: String, consent: String, turnOn: String, onTurnOn: () -> Unit) {
+    MenuCard(icon, title, subtitle) {
+        MenuNote(consent)
+        MenuEntry(Sym.TOGGLE_ON, turnOn, onClick = onTurnOn)
+    }
+}
+
+/** The two focus places of a search with results: the field, and the first result that can be taken. */
+class SearchFocus(val field: FocusRequester, val first: FocusRequester) {
+    fun toField() { runCatching { field.requestFocus() } }
+    fun toFirst() { runCatching { first.requestFocus() } }
+}
+
+/**
+ * A search field and what it found, with the keyboard's way between them, made once: when results arrive ([hasResults],
+ * looked at each time [arrival] changes) the focus moves to the first that can be taken, so Enter, Enter is search and take; Down
+ * from the field goes there and Up from there comes back. [field] draws the field with [SearchFocus.field]; [results] draws the
+ * rest, passing `firstResult` as the modifier of that first entry.
+ */
+@Composable
+fun SearchWithResults(hasResults: Boolean, arrival: Any?, field: @Composable SearchFocus.() -> Unit, results: @Composable SearchFocus.(firstResult: Modifier) -> Unit) {
+    val focus = remember { SearchFocus(FocusRequester(), FocusRequester()) }
+    LaunchedEffect(arrival) { if (hasResults) focus.toFirst() }
+    Box(Modifier.onPreviewKeyEvent { e ->
+        if (!hasResults || e.key != Key.DirectionDown) false
+        else { if (e.type == KeyEventType.KeyDown) focus.toFirst(); true }
+    }) { focus.field() }
+    focus.results(Modifier.focusRequester(focus.first).onPreviewKeyEvent { e ->
+        if (e.key != Key.DirectionUp) false else { if (e.type == KeyEventType.KeyDown) focus.toField(); true }
+    })
+}
+
+/**
+ * One row of a list the user orders: its title and, if any, a quieter line under it, then Up, Down and Remove. [first] and
+ * [last]: the ends of the list, where the arrow that leads nowhere is dimmed. The list itself, and what a press does, are the caller's.
+ */
+@Composable
+fun OrderedListRow(title: String, sub: String? = null, upLabel: String, downLabel: String, removeLabel: String, first: Boolean, last: Boolean, minHeight: androidx.compose.ui.unit.Dp = 48.dp,
+                   onUp: () -> Unit, onDown: () -> Unit, onRemove: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = minHeight).padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, maxLines = 1)
+            if (sub != null) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        IconButton(onClick = onUp, enabled = !first, modifier = Modifier.semantics { contentDescription = upLabel }) { SymIcon(Sym.ARROW_UPWARD) }
+        IconButton(onClick = onDown, enabled = !last, modifier = Modifier.semantics { contentDescription = downLabel }) { SymIcon(Sym.ARROW_DOWNWARD) }
+        IconButton(onClick = onRemove, modifier = Modifier.semantics { contentDescription = removeLabel }) { SymIcon(Sym.CLOSE) }
+    }
+}
+
+/** How long each of several values shows in the bar, as a row of choices of seconds ("3 s", "5 s") and, from a minute, minutes. */
+@Composable
+fun TurnChooser(label: String, help: String, choices: List<Int>, selected: Int, onChoose: (Int) -> Unit) {
+    val res = LocalContext.current.resources
+    ChoiceRow(label, choices.map { sec ->
+        sec to if (sec % 60 == 0) res.getQuantityString(R.plurals.common_minutes_short, sec / 60, sec / 60) else res.getQuantityString(R.plurals.common_seconds_short, sec, sec)
+    }, selected, help = help, onSelect = onChoose)
 }
 
 /** An entry that puts [text] on the clipboard and reads "Copied", with a check, for two seconds; no toast. */

@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -35,18 +32,19 @@ import com.meridian11.books.bentobar.data.Online
 import com.meridian11.books.bentobar.data.Store
 import com.meridian11.books.bentobar.items.FxRules.FxPair
 import com.meridian11.books.bentobar.items.FxRules.PairQuote
-import com.meridian11.books.bentobar.ui.ChoiceRow
 import com.meridian11.books.bentobar.ui.MenuCard
 import com.meridian11.books.bentobar.ui.MenuDivider
 import com.meridian11.books.bentobar.ui.MenuEntry
 import com.meridian11.books.bentobar.ui.MenuNote
+import com.meridian11.books.bentobar.ui.OffGate
+import com.meridian11.books.bentobar.ui.OrderedListRow
 import com.meridian11.books.bentobar.ui.SearchField
+import com.meridian11.books.bentobar.ui.TurnChooser
 import com.meridian11.books.bentobar.ui.rememberTick
 import com.meridian11.books.bentobar.ui.updatedNote
 import com.meridian11.books.bentobar.util.Dates
 import com.meridian11.books.bentobar.util.Now
 import com.meridian11.books.bentobar.util.Sym
-import com.meridian11.books.bentobar.util.SymIcon
 import java.time.ZoneId
 import kotlin.math.abs
 
@@ -65,12 +63,10 @@ internal fun FxMenu(item: ItemConfig, host: MenuHost) {
 
     val table = FxItem.table(ask = false)
     when {
-        !on && !FxItem.isStaged(item) -> MenuCard(Sym.SWAP_VERT, title, stringResource(if (Online.setUp(Online.Service.FRANKFURTER)) R.string.common_off_in_setup else R.string.common_not_set_up)) {
-            MenuNote(stringResource(R.string.fx_consent))
-            MenuEntry(Sym.TOGGLE_ON, stringResource(R.string.fx_turn_on)) {
-                Online.turnOn(Online.Service.FRANKFURTER)
-                Ticker.refresh(FxItem.type)
-            }
+        !on && !FxItem.isStaged(item) -> OffGate(Sym.SWAP_VERT, title, stringResource(if (Online.setUp(Online.Service.FRANKFURTER)) R.string.common_off_in_setup else R.string.common_not_set_up),
+            stringResource(R.string.fx_consent), stringResource(R.string.fx_turn_on)) {
+            Online.turnOn(Online.Service.FRANKFURTER)
+            Ticker.refresh(FxItem.type)
         }
         pairs.isEmpty() -> MenuCard(Sym.SWAP_VERT, title, stringResource(R.string.fx_none_yet)) {
             MenuEntry(Sym.ADD, stringResource(R.string.fx_add_pairs)) { host.openItemSettings(item.id) }
@@ -202,33 +198,14 @@ internal fun FxOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
             }
         }
     }
-    val res = LocalContext.current.resources
-    ChoiceRow(
-        stringResource(R.string.fx_turn_label),
-        FxRules.TURNS.map { sec ->
-            sec to if (sec % 60 == 0) res.getQuantityString(R.plurals.common_minutes_short, sec / 60, sec / 60)
-            else res.getQuantityString(R.plurals.stocks_seconds_short, sec, sec)
-        },
-        FxRules.turnSec(item),
-        help = stringResource(R.string.fx_turn_help),
-    ) { set(item.with("turnSec", it.takeIf { s -> s != FxRules.TURN_SEC }?.toString())) }
+    TurnChooser(stringResource(R.string.fx_turn_label), stringResource(R.string.fx_turn_help), FxRules.TURNS, FxRules.turnSec(item)) {
+        set(item.with("turnSec", it.takeIf { s -> s != FxRules.TURN_SEC }?.toString()))
+    }
 }
 
 @Composable
 private fun FollowedPairRow(item: ItemConfig, p: FxPair, first: Boolean, last: Boolean, set: (ItemConfig) -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(p.code, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-        val up = stringResource(R.string.fx_move_up, p.code)
-        val down = stringResource(R.string.fx_move_down, p.code)
-        val remove = stringResource(R.string.fx_remove, p.code)
-        IconButton(onClick = { set(FxRules.movePair(item, p, -1)) }, enabled = !first, modifier = Modifier.semantics { contentDescription = up }) {
-            SymIcon(Sym.ARROW_UPWARD)
-        }
-        IconButton(onClick = { set(FxRules.movePair(item, p, 1)) }, enabled = !last, modifier = Modifier.semantics { contentDescription = down }) {
-            SymIcon(Sym.ARROW_DOWNWARD)
-        }
-        IconButton(onClick = { set(FxRules.removePair(item, p)) }, modifier = Modifier.semantics { contentDescription = remove }) {
-            SymIcon(Sym.CLOSE)
-        }
-    }
+    OrderedListRow(p.code, upLabel = stringResource(R.string.fx_move_up, p.code), downLabel = stringResource(R.string.fx_move_down, p.code),
+        removeLabel = stringResource(R.string.fx_remove, p.code), first = first, last = last,
+        onUp = { set(FxRules.movePair(item, p, -1)) }, onDown = { set(FxRules.movePair(item, p, 1)) }, onRemove = { set(FxRules.removePair(item, p)) })
 }
