@@ -31,7 +31,7 @@ class FakeHttp : Transport {
      */
     override fun get(request: Request): Reply {
         asked += request
-        if (HttpTransport.address(request) == null) return Reply.Failed(Why.UNREADABLE)
+        if (HttpTransport.address(request) == null) return Reply.Failed(Why.REFUSED, sent = false)
         val queue = replies[request.host.domain + request.path] ?: return Reply.Failed(Why.STATUS, 404)
         return if (queue.size > 1) queue.removeFirst() else queue.first()
     }

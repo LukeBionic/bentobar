@@ -30,7 +30,7 @@ class HttpTransport(
 ) : Transport {
 
     override fun get(request: Request): Reply {
-        val address = address(request) ?: return Reply.Failed(Why.UNREADABLE)
+        val address = address(request) ?: return Reply.Failed(Why.REFUSED, sent = false)
         val deadline = System.nanoTime() + totalMs * 1_000_000L
         var connection: HttpURLConnection? = null
         return try {

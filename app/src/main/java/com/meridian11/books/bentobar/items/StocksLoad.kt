@@ -4,7 +4,6 @@ import com.meridian11.books.bentobar.data.ItemConfig
 import com.meridian11.books.bentobar.data.Kept
 import com.meridian11.books.bentobar.data.Online
 import com.meridian11.books.bentobar.data.Section
-import com.meridian11.books.bentobar.net.Host
 import com.meridian11.books.bentobar.net.Http
 import com.meridian11.books.bentobar.net.Reply
 
@@ -54,10 +53,9 @@ object StocksLoad {
         val key = Online.key(service)
         if (!mayAsk(key)) return null
         val sym = Finnhub.symbol(symbol) ?: return null
-        val before = Http.sent(Host.FINNHUB)
         val reply = Http.get(Finnhub.quoteRequest(sym, key))
         // Without a network the request helper answers by itself and nothing leaves the device.
-        val went = Http.sent(Host.FINNHUB) != before
+        val went = reply.sent
         return when (reply) {
             is Reply.Ok -> when (val read = Finnhub.quote(reply.text)) {
                 is Finnhub.Read.Numbers -> {

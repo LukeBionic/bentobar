@@ -2,6 +2,8 @@ package com.meridian11.books.bentobar.items
 
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import com.meridian11.books.bentobar.BuildConfig
 import com.meridian11.books.bentobar.data.Online
 import com.meridian11.books.bentobar.util.Now
 import java.util.concurrent.Executor
@@ -36,7 +38,9 @@ object Background {
      * switched off: a state that is computed all the same asks for nothing.
      */
     fun wiring(type: String, service: Online.Service? = null, threadName: String = type) = Refresher.Wiring(executor(threadName), { main.post(it) }, Now::elapsed,
-        changed = { Ticker.refresh(type) }, mayLoad = { Ticker.running && (service == null || Online.on(service)) })
+        changed = { Ticker.refresh(type) }, mayLoad = { Ticker.running && (service == null || Online.on(service)) },
+        // Only the class of what was thrown, and only in a debug build: its message could hold an address, and with it a key.
+        report = { kind -> if (BuildConfig.DEBUG) Log.w(Env.TAG, "a load for $type threw $kind") })
 
     /**
      * A [Refresher] for the item type with the id [type]. With [service], its snapshots are forgotten

@@ -52,7 +52,7 @@ class HttpTest {
             "/a b", "/a\\b", "/a\nb", "/ä", "/a/", "/%2e%2e/x", "/a:b")) {
             assertNull(path, HttpTransport.address(Request(Host.AIRLABS, path)))
             val reply = never.get(Request(Host.AIRLABS, path))
-            assertTrue(path, reply is Reply.Failed && reply.why == Why.UNREADABLE)
+            assertTrue(path, reply is Reply.Failed && reply.why == Why.REFUSED && !reply.sent)
         }
     }
 
@@ -68,8 +68,17 @@ class HttpTest {
         val refused = Request(Host.AIRLABS, "/a/../b")
         fake.reply(Host.AIRLABS, "/a/../b", "{}")
         val reply = fake.get(refused)
-        assertTrue(reply is Reply.Failed && reply.why == Why.UNREADABLE)
-        assertTrue(HttpTransport().get(refused).let { it is Reply.Failed && it.why == Why.UNREADABLE })
+        assertTrue(reply is Reply.Failed && reply.why == Why.REFUSED)
+        assertTrue(HttpTransport().get(refused).let { it is Reply.Failed && it.why == Why.REFUSED })
+    }
+
+    @Test fun aRefusedRequestLeftNothingAndIsNotCounted() {
+        val refused = Request(Host.AIRLABS, "/a/../b")
+        val reply = Http.get(refused)
+        assertTrue(reply is Reply.Failed && reply.why == Why.REFUSED && !reply.sent)
+        assertEquals(0, Http.sent(Host.AIRLABS))
+        assertEquals(emptyList<Request>(), fake.asked)
+        assertEquals(listOf("GET airlabs.co/a/../b refused: not a plain path"), logged)
     }
 
     @Test fun nothingGoesOutUnlessTheAppAllowsIt() {

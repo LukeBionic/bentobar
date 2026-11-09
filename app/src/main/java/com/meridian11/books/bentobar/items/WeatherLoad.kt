@@ -83,26 +83,16 @@ object WeatherLoad {
      * for (where the device is, for My location, is not among them: it is held in memory only).
      */
     fun load(place: Place, last: Reading?, now: Long, up: Long = 0, places: () -> Set<Place>): Reading? {
-        val before = Http.sent(Host.OPEN_METEO)
         val reply = Http.get(forecastRequest(place))
-        // Without a network the request helper answers by itself and nothing leaves the device.
-        val went = Http.sent(Host.OPEN_METEO) != before
         val good = (reply as? Reply.Ok)?.let { WeatherRules.read(it.text, place, now, up) }
         if (good != null) {
             keep(good, places())
             return good
         }
-        val failed = reply as? Reply.Failed
-        if (failed?.why == Why.OFF) return null
-        val wait = failed?.retryAfterSec ?: 0
-        val failure = when {
-            failed?.why == Why.OFFLINE -> Failure.OFFLINE
-            // 429 is "slow down"; so is any answer that asks for more patience than the usual retry, so that the words and the wait agree.
-            failed?.status == 429 || wait * 1000 > WeatherRules.RETRY_MS -> Failure.SLOW_DOWN
-            // A status, a timeout, too much, or a reply that is no forecast (a public network's sign-in page).
-            else -> Failure.NO_ANSWER
-        }
-        return failed(place, last, failure, went, wait)
+        // Without a network the request helper answers by itself and nothing leaves the device: no miss counts for that.
+        // A status, a timeout, too much, or a reply that is no forecast (a public network's sign-in page) is no answer.
+        val missed = Failures.missed(reply, slowAfterMs = WeatherRules.RETRY_MS) ?: return null
+        return failed(place, last, missed.failure, missed.went, missed.waitSec)
     }
 
     /**
@@ -218,7 +208,7 @@ class WeatherSource(
     fun peek(item: ItemConfig): Reading? = place(item)?.let { readings.peek(it) }
 
     /** The state [item] is in, asking nothing. */
-    fun status(item: ItemConfig, now: Long): Status {
+    fun status(item: ItemConfig, now: Long): Status<Reading> {
         val on = Online.on(service)
         val place = place(item)
         return WeatherRules.status(hasPlace = place != null, on = on, setUp = Online.setUp(service),

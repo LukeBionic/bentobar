@@ -4,7 +4,6 @@ import androidx.compose.runtime.Immutable
 import com.meridian11.books.bentobar.net.Host
 import com.meridian11.books.bentobar.net.Reply
 import com.meridian11.books.bentobar.net.Request
-import com.meridian11.books.bentobar.net.Why
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -65,13 +64,12 @@ object Finnhub {
     fun searchRequest(text: String, key: String) = Request(Host.FINNHUB, SEARCH, listOf("q" to text, "exchange" to "US", "token" to key))
 
     /** What a failed request stands for. Null: it was not asked after all (the switch went off, the bar hid). */
-    fun failure(reply: Reply.Failed): Failure? = when {
-        reply.why == Why.OFF -> null
-        reply.why == Why.OFFLINE -> Failure.OFFLINE
-        reply.status == 401 -> Failure.REFUSED
-        reply.status == 403 -> Failure.NO_ACCESS
-        reply.status == 429 -> Failure.SLOW_DOWN
-        else -> Failure.NO_ANSWER
+    fun failure(reply: Reply.Failed): Failure? = Failures.kind(reply, Failure.OFFLINE, Failure.SLOW_DOWN, Failure.NO_ANSWER) { status ->
+        when (status) {
+            401 -> Failure.REFUSED
+            403 -> Failure.NO_ACCESS
+            else -> null
+        }
     }
 
     /** What a quote reply says. */

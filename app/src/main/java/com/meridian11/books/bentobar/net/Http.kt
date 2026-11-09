@@ -32,13 +32,20 @@ class Request(val host: Host, val path: String, val query: List<Pair<String, Str
 
 /** What a request came to. Never an exception: its message could hold the address, and with it a key. */
 sealed interface Reply {
+    /** Whether a request really left the device: what a failure in a row counts by. Nothing goes out for a request that was [Why.OFF] or refused. */
+    val sent: Boolean
+
     /** The service answered with a 2xx status: its text (UTF-8, at most [Http.MAX_BYTES]). */
     class Ok(val text: String) : Reply {
+        override val sent: Boolean get() = true
         override fun toString() = "ok"
     }
 
-    /** No answer worth reading. [status]: the HTTP status where there was one, else 0. [retryAfterSec]: what a 429 or 503 asked for. */
-    class Failed(val why: Why, val status: Int = 0, val retryAfterSec: Long? = null) : Reply {
+    /**
+     * No answer worth reading. [status]: the HTTP status where there was one, else 0. [retryAfterSec]: what a 429 or 503
+     * asked for. [sent]: false when nothing left the device (the gate, no network, a request the transport refuses).
+     */
+    class Failed(val why: Why, val status: Int = 0, val retryAfterSec: Long? = null, override val sent: Boolean = true) : Reply {
         override fun toString() = if (status != 0) "$why $status" else "$why"
     }
 }
@@ -54,8 +61,10 @@ enum class Why {
     STATUS,
     /** More than [Http.MAX_BYTES]. */
     TOO_LARGE,
-    /** Anything else: a broken stream, a request that wasn't well formed. Whether a reply's text makes sense is its reader's question. */
+    /** Anything else: a broken stream. Whether a reply's text makes sense is its reader's question. */
     UNREADABLE,
+    /** BentoBar's own mistake, not the network's: a request that could never leave the device ([HttpTransport.address] won't make an address of it). Nothing is sent, and it is not counted. */
+    REFUSED,
 }
 
 /** What carries a request: [HttpTransport] in the app, a fake in tests. It must not throw. */
@@ -99,8 +108,10 @@ object Http {
      */
     fun get(request: Request): Reply {
         if (onMain()) return refused(request, "the main thread")
-        if (!allowed(request.host)) return Reply.Failed(Why.OFF)
-        if (!connected()) return Reply.Failed(Why.OFFLINE)
+        if (!allowed(request.host)) return Reply.Failed(Why.OFF, sent = false)
+        if (!connected()) return Reply.Failed(Why.OFFLINE, sent = false)
+        // Before anything is counted as sent: the counter must not say requests left when the transport would refuse them.
+        if (HttpTransport.address(request) == null) { log("GET $request refused: not a plain path"); return Reply.Failed(Why.REFUSED, sent = false) }
         counts.incrementAndGet(request.host.ordinal)
         val reply = try {
             transport.get(request)
@@ -114,7 +125,7 @@ object Http {
 
     private fun refused(request: Request, why: String): Reply {
         log("GET $request refused: $why")
-        return Reply.Failed(Why.OFF)
+        return Reply.Failed(Why.OFF, sent = false)
     }
 
     /** How many requests really went out to [host] since the app started (or [resetCounts]): for the debug hook and for tests. */

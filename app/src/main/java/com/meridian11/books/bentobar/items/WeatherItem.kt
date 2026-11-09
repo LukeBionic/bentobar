@@ -82,7 +82,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     }
 
     /** The state [item] is in at [now]: the staged one in a test, else the real one. It asks nothing. */
-    internal fun status(item: ItemConfig, now: Long): Status =
+    internal fun status(item: ItemConfig, now: Long): Status<Reading> =
         staged(item)?.let { WeatherRules.status(hasPlace = true, on = true, setUp = true, reading = it.reading, now = now) } ?: source.status(item, now)
 
     /**
