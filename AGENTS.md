@@ -258,7 +258,7 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   outside the layout, so a pasted layout or a restored backup turns nothing on. Off (Setup › Online
   services) stops requests at once and deletes what was fetched (`ItemType.forgetFetched`).
   The one location permission is `ACCESS_COARSE_LOCATION`, for Weather's My location, asked for only when
-  an item chooses it (the exported `MainActivity` asks it only for a layout with one: `HereRules.mayAsk`).
+  an item chooses it. The ask is made in-process (a menu names the permission; the exported `MainActivity` never reads one from an intent), so the caller decides.
   Where the device is is kept only while such an item is outside Off and the switch is on
   (`HereRules.wanted`; else it is forgotten, with an ask on its way), and Android is asked only while
   such an item is sampled (`TickRules.needed`, as `Ticker.sampled`): on screen, waiting in Hidden for its

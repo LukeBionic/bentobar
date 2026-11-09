@@ -49,14 +49,15 @@ object Store {
 
     /**
      * The saved answer in [noBackupDir]. With none there, the answer an earlier version kept in the prefs ([legacy]) is
-     * moved over once; a restored backup that still holds one counts as that install's own answer.
+     * moved over once, and [legacyMoved] is called when the file holds it, so the caller may drop the old key; a restored backup that still holds one counts as that install's own answer.
      */
-    internal fun loadConsent(noBackupDir: File, legacy: String?): Consent {
+    internal fun loadConsent(noBackupDir: File, legacy: String?, legacyMoved: () -> Unit = {}): Consent {
         val file = File(noBackupDir, CONSENT_FILE).also { consentFile = it }
         fun parse(name: String?) = name?.trim()?.let { runCatching { Consent.valueOf(it) }.getOrNull() }
-        parse(runCatching { file.takeIf { it.isFile }?.readText(Charsets.UTF_8) }.getOrNull())?.let { return it }
+        parse(runCatching { file.takeIf { it.isFile }?.readText(Charsets.UTF_8) }.getOrNull())?.let { legacyMoved(); return it }
         val moved = parse(legacy) ?: return Consent.NOT_ASKED
-        runCatching { file.writeText(moved.name, Charsets.UTF_8) }
+        // Only a file that now holds the answer lets the legacy key go: a failed write must lose nothing.
+        if (runCatching { file.writeText(moved.name, Charsets.UTF_8) }.isSuccess) legacyMoved()
         return moved
     }
 
@@ -64,8 +65,9 @@ object Store {
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("bentobar", Context.MODE_PRIVATE)
-        consentState.value = loadConsent(context.applicationContext.noBackupFilesDir, prefs.getString(KEY_CONSENT, null))
-        if (prefs.contains(KEY_CONSENT)) prefs.edit().remove(KEY_CONSENT).apply() // now in the no-backup file
+        consentState.value = loadConsent(context.applicationContext.noBackupFilesDir, prefs.getString(KEY_CONSENT, null)) {
+            prefs.edit().remove(KEY_CONSENT).apply() // now in the no-backup file
+        }
         val raw = prefs.getString(KEY, null)
         val read = raw?.let(::decode)
         if (raw != null && read == null) {

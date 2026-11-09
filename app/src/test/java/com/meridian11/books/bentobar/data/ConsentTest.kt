@@ -36,4 +36,17 @@ class ConsentTest {
         assertEquals(Store.Consent.NOT_ASKED, Store.loadConsent(dir, legacy = null))
         assertFalse(File(dir, "consent").readText().isEmpty())
     }
+
+    @Test fun theOldKeyGoesOnlyOnceTheFileHoldsTheAnswer() {
+        val dir = folder.newFolder()
+        var gone = 0
+        assertEquals(Store.Consent.AGREED, Store.loadConsent(dir, legacy = "AGREED") { gone++ })
+        assertEquals(1, gone)
+        // A write that fails (here a directory stands where the file belongs) keeps the old key: nothing is lost.
+        val blocked = folder.newFolder()
+        File(blocked, "consent").mkdir()
+        gone = 0
+        assertEquals(Store.Consent.AGREED, Store.loadConsent(blocked, legacy = "AGREED") { gone++ })
+        assertEquals(0, gone)
+    }
 }

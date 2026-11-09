@@ -20,7 +20,8 @@ class WindowReadingTest {
         // The service, its windows and their node trees. Nothing that holds a node or a window leaves bar/'s two scanning files.
         val apis = listOf(Regex("""\bAccessibilityService\b(?!\.GLOBAL_ACTION_)"""), Regex("""\bAccessibilityNodeInfo\b"""), Regex("""\bAccessibilityWindowInfo\b"""),
             Regex("""\bAccessibilityEvent\b"""), Regex("""\bfindFocus\b"""), Regex("""\brootInActiveWindow\b"""), Regex("""\bperformAction\b"""),
-            Regex("""\bfindAccessibilityNodeInfo\w*"""), Regex("""\bgetRoot\b"""), Regex("""\.windows\b"""), Regex("""\btakeScreenshot\w*"""),
+            Regex("""\bfindAccessibilityNodeInfo\w*"""), Regex("""\bgetRoot\b"""), Regex("""\.root\b"""), Regex("""\.windows\b"""), Regex("""\bwindowsOnAllDisplays\b"""),
+            Regex("""\bgetRootInActiveWindow\b"""), Regex("""\bgetTitle\b"""), Regex("""\btakeScreenshot\w*"""),
             Regex("""\bgetWindows\b"""), Regex("""\bgetChild\b"""), Regex("""\bAccessibilityNodeInfoCompat\b"""))
         for (f in sources) {
             val place = f.place()
@@ -38,13 +39,13 @@ class WindowReadingTest {
     }
 
     @Test fun itemsNeverHoldTheService() {
-        // Items get Env.global and Env.running, not the service: nothing outside bar/ names its type or the connected one.
+        // Items get Env.global and Env.running, not the service: only BarService and two small readers name the connected one.
         for (f in sources) {
             val place = f.place()
-            if (place.startsWith("bar/")) continue
+            // Not even the other files in bar/: a bar/ helper that held the service could read windows the scan files may not.
             val text = code(f)
             assertTrue("$place names the service: items ask Env.running or Env.global", !Regex("""\bBarService\.current\b""").containsMatchIn(text) ||
-                place in setOf("items/Env.kt", "ui/BarMenuActivity.kt"))
+                place in setOf("bar/BarService.kt", "items/Env.kt", "ui/BarMenuActivity.kt"))
         }
     }
 
@@ -53,7 +54,7 @@ class WindowReadingTest {
         // nothing else reads a title. The title is compared, never logged or kept. AGENTS.md names this check.
         val holders = sources.filter { "AccessibilityWindowInfo" in code(it) }
         assertEquals(scanFiles, holders.map { it.place() }.toSet())
-        val titles = holders.flatMap { f -> code(f).lines().withIndex().filter { Regex("""\.title\b""").containsMatchIn(it.value) }.map { f.place() to it.value.trim() } }
+        val titles = holders.flatMap { f -> code(f).lines().withIndex().filter { Regex("""\.(title|getTitle\(\))""").containsMatchIn(it.value) }.map { f.place() to it.value.trim() } }
             // The item type's own title (the tooltip's text) is not a window's.
             .filterNot { (_, line) -> "Items.of(" in line }
         assertEquals("the lines that read a window's title: $titles", 1, titles.size)
@@ -77,7 +78,14 @@ class WindowReadingTest {
     @Test fun anIntentCannotNameAPermissionForTheSettingsWindowToAsk() {
         // MainActivity is exported, so any app can start it. A permission prompt is asked for in-process, never read from an extra.
         val main = code(File("src/main/java/com/meridian11/books/bentobar/ui/MainActivity.kt"))
-        assertTrue("MainActivity reads a permission name from an intent", !Regex("""requestPermissions\([^)]*getStringExtra|getStringExtra\([^)]*(REQUEST|request)""").containsMatchIn(main))
-        assertTrue(!main.contains("EXTRA_REQUEST"))
+        // The one call asks for what takeAsked() returned (set in-process), so no extra can reach it, under any constant or local.
+        val calls = Regex("""requestPermissions\(""").findAll(main).count()
+        assertEquals("MainActivity asks for a permission in exactly one place", 1, calls)
+        assertTrue("the ask must take its permission from takeAsked()", Regex("""takeAsked\(\)\?\.let \{ perm ->[^\n]*requestPermissions\(arrayOf\(perm\), 1\)""").containsMatchIn(main))
+        // The intent's strings it does read are the two it always read.
+        for (m in Regex("""getStringExtra\(([^)]*)\)""").findAll(main)) assertEquals("MainActivity reads an extra it should not", "EXTRA_ITEM", m.groupValues[1])
+        assertTrue("MainActivity reads the intent's extras as a whole", !Regex("""\b(getExtras|getParcelableExtra|getSerializableExtra|getStringArrayExtra|getBundleExtra)\b|\.extras\b""").containsMatchIn(main))
+        // And no other file hands an intent's extra to a permission prompt.
+        for (f in sources) for (m in Regex("""requestPermissions\([^\n]*""").findAll(code(f))) assertTrue("${f.place()}: ${m.value}", "Extra" !in m.value)
     }
 }
