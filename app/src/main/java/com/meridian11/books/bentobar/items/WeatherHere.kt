@@ -1,5 +1,6 @@
 package com.meridian11.books.bentobar.items
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
@@ -53,12 +54,16 @@ object WeatherHere {
 
         override fun on(): Boolean = service()?.isLocationEnabled == true
 
+        // The coarse-location grant is asked for only when a Weather item chooses My location (HereRules), and a call made
+        // without it throws SecurityException, which the runCatching here (and the try below) turns into "no fix".
+        @SuppressLint("MissingPermission")
         override fun last(): Located? {
             val lm = service() ?: return null
             return providers(lm).mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
                 .maxByOrNull { it.elapsedRealtimeNanos }?.let(::located)
         }
 
+        @SuppressLint("MissingPermission") // as in last(): a missing grant throws, and the catch below answers "no fix"
         override fun current(answer: (Located?) -> Unit): Locator.Cancel? {
             val lm = service() ?: return null
             val provider = providers(lm).firstOrNull() ?: return null

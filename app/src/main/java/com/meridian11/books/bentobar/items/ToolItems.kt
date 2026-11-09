@@ -1,5 +1,6 @@
 package com.meridian11.books.bentobar.items
 
+import android.annotation.SuppressLint
 import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Context
@@ -124,6 +125,9 @@ object CaffeineItem : ItemType("caffeine", R.string.item_caffeine_title, Sym.COF
         return true
     }
 
+    // Caffeine.until is a StateFlow read as a plain value: rememberTick() below recomposes the menu every tick, which is
+    // what keeps the countdown current, so there is nothing for collectAsState to add.
+    @SuppressLint("StateFlowValueCalledInComposition")
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, _ ->
         rememberTick()
         val on = Caffeine.active()
