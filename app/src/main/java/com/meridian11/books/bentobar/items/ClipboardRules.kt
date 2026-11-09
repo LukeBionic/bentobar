@@ -111,7 +111,7 @@ object ClipboardRules {
     /** Recent clips that aren't already pinned on [item]. */
     fun unpinnedRecent(recent: List<String>, pins: List<String>): List<String> {
         val pinnedSet = pins.toHashSet()
-        return recent.filterNot { it in pinnedSet }.take(MOST_RECENT)
+        return recent.filterNot { clean(it) in pinnedSet }.take(MOST_RECENT)
     }
 
     /** What the bar shows for [pins] and [recent]. Spoken description never quotes the snippet text. */
