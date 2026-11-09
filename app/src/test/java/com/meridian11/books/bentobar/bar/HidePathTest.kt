@@ -41,6 +41,16 @@ class HidePathTest {
         assertTrue(left, "watch.clear()" in left && "main.removeCallbacks(sample)" in left)
     }
 
+    /** The window decision is pinned in BarRulesTest and the schedule in ColorWatchTest; these are the lines that make them do anything. */
+    @Test fun theBarChangingLateAsksForAReadingWhereTheDecisionSaysSo() {
+        val place = code.substringAfter("private fun place(").substringBefore("\n    }\n")
+        val show = place.indexOf("strip.show")
+        assertTrue("place() raises SLOW once the strip is back", show >= 0 && place.indexOf("colors.readSoon(ColorWatch.Cause.SLOW, 250)", show) > show)
+        val check = code.substringAfter("private fun check(full: Boolean) {").substringBefore("private fun place(")
+        assertTrue("a new status bar window asks for a quick reading", "if (d.read == BarRules.Read.NEW_BAR_WINDOW) colors.readSoon(ColorWatch.Cause.QUICK, 250)" in check)
+        assertTrue("windows that moved are told to the colour reader", "else if (d.read == BarRules.Read.WINDOWS_MOVED) colors.windowsMoved()" in check)
+    }
+
     /** A screenshot's answer can come after stop(): running it is what closes its buffer, so the thread it runs on stays. */
     @Test fun aScreenshotAnsweredAfterStopStillClosesItsBuffer() {
         val scan = File("src/main/java/com/meridian11/books/bentobar/bar/StatusBarScan.kt").readText()
