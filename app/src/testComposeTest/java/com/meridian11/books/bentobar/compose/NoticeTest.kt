@@ -2,6 +2,7 @@ package com.meridian11.books.bentobar.compose
 
 import android.app.Application
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -27,6 +28,16 @@ class NoticeTest {
     @get:Rule val rule = createComposeRule()
 
     @Before fun env() = Env.init(ApplicationProvider.getApplicationContext<Application>())
+
+    @Test fun aMessagePostedAsTheWindowComposesIsNotLost() {
+        // A recreated window: BarPage posts its Undo as it composes, in the same pass as the one that starts listening.
+        rule.setContent {
+            val notices = rememberNotices()
+            LaunchedEffect(Unit) { Notice.post("back", "Undo") }
+            SnackbarHost(notices)
+        }
+        rule.onNodeWithText("back").assertIsDisplayed()
+    }
 
     @Test fun aNewMessageReplacesTheOneThatIsUp() {
         val undone = mutableListOf<String>()

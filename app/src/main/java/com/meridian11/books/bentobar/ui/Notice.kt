@@ -6,8 +6,10 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 /**
  * Short messages. Without an action it's a toast, which fades on its own. With one (Undo, Open
@@ -32,9 +34,15 @@ object Notice {
 fun rememberNotices(): SnackbarHostState {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
-        Notice.messages.collectLatest { m ->
-            if (snackbar.showSnackbar(m.text, m.action, duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) m.onAction?.invoke()
-            m.onGone?.invoke()
+        // A plain collect, which subscribes the moment this coroutine first runs. collectLatest subscribes from a coroutine of its own, queued
+        // behind whatever else this composition started (BarPage's post on a recreated window), and that post was lost with no one yet listening.
+        var showing: Job? = null
+        Notice.messages.collect { m ->
+            showing?.cancelAndJoin()
+            showing = launch {
+                if (snackbar.showSnackbar(m.text, m.action, duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) m.onAction?.invoke()
+                m.onGone?.invoke()
+            }
         }
     }
     return snackbar
