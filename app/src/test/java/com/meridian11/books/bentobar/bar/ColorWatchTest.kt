@@ -400,6 +400,16 @@ class ColorWatchTest {
         assertTrue("and its readings keep their distance: $after", after.zipWithNext().all { (a, b) -> b - a >= 60_000 })
     }
 
+    /**
+     * The stream's age goes on counting after its last cause, and the gap went with it: a stream that stopped at ten seconds
+     * apart held its last follow-up back a minute once its age passed five minutes. It keeps the gap it stopped with.
+     */
+    @Test fun theLastFollowUpOfAStreamKeepsTheGapTheStreamStoppedWith() {
+        val after = wallpaper(until = 305_000, end = 400_000).filter { it > 305_000 }
+        assertEquals("$after", 2, after.size)
+        assertEquals("$after", 10_000L, after[1] - after[0])
+    }
+
     /** Readings aren't budgeted away from a change of windows or a return either, once a stream ends. */
     @Test fun aStreamThatStopsIsForgotten() {
         val watch = ColorWatch()

@@ -90,7 +90,9 @@ class ColorWatch {
     fun due(now: Long): Long? {
         val next = (slow + quick).minOrNull() ?: return null
         // A long stream's gap holds for every reading of it, a cause's later ones and the follow-ups too; not for a slow cause's first.
-        val earliest = asked.lastOrNull()?.takeIf { streamSince != null && gap(now) > BarNeighbours.APART_MS }?.plus(gap(now)) ?: next
+        // The gap as it stood at the last cause: a stream that has stopped doesn't go on lengthening what its last cause waits for.
+        val apart = gap(lastCause ?: now)
+        val earliest = asked.lastOrNull()?.takeIf { streamSince != null && apart > BarNeighbours.APART_MS }?.plus(apart) ?: next
         val held = maxOf(next, earliest)
         return (minOf(held, slowFirst ?: held) - now).coerceAtLeast(0)
     }
