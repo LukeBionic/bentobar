@@ -243,10 +243,18 @@ object Apps {
     /** Installed, updated, turned off or removed. No permission asked: these broadcasts come to any app that can see the package, and this one sees the launchable apps. */
     private val packages = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val pkg = intent.data?.schemeSpecificPart ?: return
-            forget(pkg)
-            AppItem.packageChanged(pkg)
+            changed(intent.data?.schemeSpecificPart ?: return)
         }
+    }
+
+    /** What changed with no receiver up (the bar away overnight, say): nothing else would tell the caches, which have no expiry. No permission. */
+    private val changes = PackageChanges { since ->
+        Env.app.packageManager.getChangedPackages(since)?.let { it.sequenceNumber to it.packageNames }
+    }
+
+    private fun changed(pkg: String) {
+        forget(pkg)
+        AppItem.packageChanged(pkg)
     }
 
     private fun startWatching() {
@@ -255,6 +263,8 @@ object Apps {
             addAction(Intent.ACTION_PACKAGE_REPLACED); addAction(Intent.ACTION_PACKAGE_CHANGED)
             addDataScheme("package")
         }, Context.RECEIVER_NOT_EXPORTED)
+        // After registering: a change in between is then heard by one or both, never by neither.
+        changes.sinceLastAsked().forEach(::changed)
     }
 
     private fun stopWatching() = Env.app.unregisterReceiver(packages)
@@ -349,7 +359,7 @@ object AppItem : ItemType("app", R.string.item_app_title, Sym.ROCKET_LAUNCH, R.s
     private data class Key(val cn: ComponentName, val mono: Boolean)
     private data class Resolved(val label: String, val icon: Bitmap?)
 
-    /** How long what was read of an app stays fresh: a change while the bar was away has no one to hear of it. */
+    /** How long what was read of an app stays fresh, for what changes with no change to its package (the device's language, say); [Apps] hears of those. */
     private const val RELOAD_MS = 60 * 60_000L
 
     /** Label and icon are resolved off the main thread, so a cold cache never stalls a status-bar tick. A reload reads the app again, not what is kept of it. */
@@ -401,7 +411,8 @@ object FolderItem : ItemType("folder", R.string.item_folder_title, Sym.GRID_VIEW
     override val group = ItemGroup.TOOLS
     override val menuWidthDp = 340
     private val label = Opt.text("label", 16)
-    // The menu draws what it finds at opening, so a folder's apps only need the caches to be told.
+    // The menu draws what it finds at opening, so a folder's apps only need the caches to be told: by the receiver while
+    // this is live, and when it comes back by what Android says changed in between (Apps.startWatching).
     override fun onLive() = Apps.watch(type)
     override fun onIdle() = Apps.unwatch(type)
     override fun state(item: ItemConfig) = ItemState(icon = Sym.GRID_VIEW, text = label.of(item).ifBlank { Env.str(R.string.common_apps) }, desc = Env.str(R.string.item_folder_title))
