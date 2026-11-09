@@ -1,6 +1,7 @@
 package com.meridian11.books.bentobar.items
 
 import com.meridian11.books.bentobar.data.ItemConfig
+import com.meridian11.books.bentobar.data.Store
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -84,8 +85,12 @@ class ClipboardRulesTest {
         assertEquals(ClipboardRules.pins(plain), ClipboardRules.pins(old))
         val bar = ClipboardRules.bar(old, emptyList(), listOf("latest"), "Empty") { "$it snippets" }
         assertEquals(ClipboardRules.bar(plain, emptyList(), listOf("latest"), "Empty") { "$it snippets" }.text, bar.text)
-        // It goes on being carried in the layout unread, and nothing looks at it.
-        assertEquals("true", old.options["pasteOnClick"])
+        // A layout that still holds the key loads, keeps it unread, and nothing breaks.
+        val text = """{"version":3,"items":[{"id":"c1","type":"clipboard","options":{"pasteOnClick":"true"}}]}"""
+        val loaded = Store.parseLayout(text)!!.items.single()
+        assertEquals("clipboard", loaded.type)
+        assertEquals("true", loaded.options["pasteOnClick"])
+        assertEquals(ClipboardRules.pins(plain), ClipboardRules.pins(loaded))
     }
 
     @Test fun recordRecentMovesEntryToFrontAndSkipsPinnedInUnpinnedView() {
@@ -99,6 +104,10 @@ class ClipboardRulesTest {
 
         assertEquals(recent, ClipboardRules.recordRecent(recent, "   "))
         assertEquals(listOf("second"), ClipboardRules.unpinnedRecent(recent, listOf("first")))
+
+        // A copy with a line end is kept as copied, but its pin is cleaned: the two are one snippet.
+        val withEnd = ClipboardRules.recordRecent(emptyList(), "hello\n")
+        assertEquals(emptyList<String>(), ClipboardRules.unpinnedRecent(withEnd, listOf("hello")))
     }
 
     @Test fun barFollowsBarModeAndCountsUnpinnedPlusPinned() {
