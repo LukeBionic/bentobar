@@ -38,7 +38,8 @@ internal class KeepAwake(
             Caffeine.until.collect { until ->
                 update()
                 main.removeCallbacks(expiry)
-                if (until != 0L && until != Caffeine.FOREVER) main.postDelayed(expiry, (until - System.currentTimeMillis()).coerceAtLeast(0) + 200)
+                // Real time left, as the timers count it: while the bar is hidden no tick is there to notice the clock moved.
+                if (until != 0L && until != Caffeine.FOREVER) main.postDelayed(expiry, Caffeine.left(until).coerceAtLeast(0) + 200)
             }
         }
         scope.launch { DisplaysItem.keepingAwake.collect { update() } }

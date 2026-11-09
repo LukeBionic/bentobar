@@ -86,6 +86,9 @@ object Caffeine {
     fun toggle(minutes: Int?) = if (active()) off() else on(minutes)
     fun active(now: Long = System.currentTimeMillis()) = until.value > now
 
+    /** Real time until [deadline] (an [until]), so a clock change can't move when keep awake lets go. */
+    fun left(deadline: Long) = anchor.left(deadline, ClockAnchor.now(Env.app))
+
     /** Follows a clock change, and turns itself off when the time is up; called every tick. */
     fun check() {
         val v = until.value
