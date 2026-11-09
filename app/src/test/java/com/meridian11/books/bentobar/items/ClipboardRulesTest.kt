@@ -30,6 +30,16 @@ class ClipboardRulesTest {
         assertNull(ClipboardRules.clean("   \n  "))
     }
 
+    @Test fun aSavedPasteOptionFromBeforeItWasRemovedChangesNothing() {
+        val plain = ItemConfig("c1", "clipboard")
+        val old = plain.copy(options = mapOf("pasteOnClick" to "true"))
+        assertEquals(ClipboardRules.pins(plain), ClipboardRules.pins(old))
+        val bar = ClipboardRules.bar(old, emptyList(), listOf("latest"), "Empty") { "$it snippets" }
+        assertEquals(ClipboardRules.bar(plain, emptyList(), listOf("latest"), "Empty") { "$it snippets" }.text, bar.text)
+        // It goes on being carried in the layout unread, and nothing looks at it.
+        assertEquals("true", old.options["pasteOnClick"])
+    }
+
     @Test fun recordRecentMovesEntryToFrontAndSkipsPinnedInUnpinnedView() {
         var recent = emptyList<String>()
         recent = ClipboardRules.recordRecent(recent, "first")

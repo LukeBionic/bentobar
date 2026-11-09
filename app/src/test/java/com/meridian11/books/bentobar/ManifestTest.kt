@@ -150,6 +150,15 @@ class ManifestTest {
         assertEquals(1, application.all("service").count { s -> s.all("action").any { it.attr("name") == "android.accessibilityservice.AccessibilityService" } })
     }
 
+    @Test fun theServiceNeverActsOnAnotherAppsField() {
+        // What the disclosure and the Play declaration say: window positions, never window content. Paste into the focused
+        // field (1.7) needed the focused node of the app in front; none of this may come back without the words changing first.
+        val acts = listOf("ACTION_SET_TEXT", "ACTION_PASTE", "findFocus", "FOCUS_INPUT", "pasteOnClick", "performAction")
+        val offenders = File("src/main/java").walkTopDown().filter { it.isFile && it.extension == "kt" }
+            .filter { f -> acts.any { it in f.readText() } }.map { it.path }.toList()
+        assertEquals(emptyList<String>(), offenders)
+    }
+
     @Test fun noCodeChangesTheServiceInfoAtRun() {
         // setServiceInfo would let code widen what the XML promises (events, flags, timeout) without this test seeing it.
         val offenders = File("src/main/java").walkTopDown().filter { it.isFile && it.extension == "kt" && "setServiceInfo" in it.readText() }.map { it.path }.toList()

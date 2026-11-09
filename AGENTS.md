@@ -291,8 +291,10 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   "preceding hour"), while the temperature and the weather code are of that instant. The rain rule
   names the hour the chance is for, and an hour's cell takes its chance from the entry after it.
 - **Least privilege** (user feedback): the accessibility config subscribes only to
-  `typeWindowsChanged`. No content events, key filtering or motion events. Code reads only the
-  status bar window. Don't add broader access for nice-to-haves.
+  `typeWindowsChanged`. No content events, key filtering or motion events. The status bar is the only
+  window whose content code reads; of any other window it reads the type and where it is. The service
+  never touches another app's window or field (paste into a field was removed in 1.8, and `ManifestTest` keeps
+  it out). Don't add broader access for nice-to-haves.
 - `notificationTimeout` must stay 0. With 200, Android merges window events; our own strip's
   resize could swallow the status bar's "hidden" event.
 - Without content events, the node cache goes stale: `clearCache()` before a full scan. Every 2 s

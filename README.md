@@ -78,7 +78,7 @@ hides when an app goes full screen or the screen locks.
 | **Device batteries** | the lowest of your mouse, keyboard, stylus or controller, when it's low | every device that reports a battery |
 | **External displays** | connected monitor resolution & refresh rate (`4K 60Hz`), when plugged in | every display's resolution, refresh rate and HDR status, plus **Keep awake while connected** |
 | **Heat** | a word when Android slows a hot device | heat level, battery temperature |
-| **Clipboard & scratchpad** | latest snippet preview or count | pinned snippets and session clipboard history; click any row to copy and optionally paste into the active field |
+| **Clipboard & scratchpad** | latest snippet preview or count | pinned snippets and session clipboard history; click any row to copy it |
 | **Weather** *(online)* | conditions and temperature of a city you pick or of where you are; rain or snow that is coming; optionally a word for the sky ("Partly cloudy", "Windy") | the next hours and days, sunrise and sunset. From [Open-Meteo](https://open-meteo.com) |
 | **Air quality & UV** *(online)* | US or European AQI and/or UV index for your city or location; pops out when AQI or UV is high | AQI band, PM2.5, PM10, Ozone ($\text{O}_3$), current and max daily UV. From [Open-Meteo](https://open-meteo.com) |
 | **Flight** *(online)* | a line with the plane where the flight is, a countdown to departure with the gate, then to landing, and delays | times at both airports, terminal, gate, baggage belt; a choice where a number flies more than once a day. From AirLabs, with a free key of your own |
@@ -144,13 +144,14 @@ with that access:
 
 - It listens only for **windows appearing, going or moving**, not their content, so it can hide
   for full-screen apps and shades.
-- It reads the **status bar's layout, and no other window**, to find free space.
+- It reads the **status bar's layout**, to find free space, and **where other windows are**, never what is
+  in them, to hide for full-screen apps and panels and to keep your items matching the status bar.
 - It copies the **colour of the status bar clock**, from a picture of the status bar's own window
   (not your screen), so your items match.
 - It runs **system actions** (screenshot, lock, overview, all apps, notifications, Quick Settings,
   power) when you pick them in the Tools menu or click a Shortcut item.
 
-BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse or touches.
+BentoBar never reads what is in another app's window and doesn't watch your keyboard, mouse or touches.
 
 **BentoBar goes online for five items only, and only after you set them up** on this device:
 
@@ -190,9 +191,7 @@ sends its developer nothing.
 
 **Clipboard** reads the text you copy while the item is in use, and keeps your last few copies in
 memory only: they are gone when BentoBar stops, and are never stored or sent. The snippets you pin are
-saved with the item, in your layout. With *Paste into active field on click* on, the accessibility
-service pastes the snippet you click into the text field you are typing in, without reading that field
-or its app.
+saved with the item, in your layout.
 
 **Now playing** reads the title, artist and artwork your media players publish, which Android shares
 only with apps that have notification access. That access is optional, and BentoBar tells Android to

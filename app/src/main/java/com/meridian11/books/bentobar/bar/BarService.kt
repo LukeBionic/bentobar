@@ -57,9 +57,10 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
 /**
- * BentoBar's accessibility service. It reads only SystemUI's status bar window (layout and text
- * colour), draws BentoBar's items in overlay windows on top of it, and performs the global
- * actions of the Tools menu when asked. It doesn't observe keys, touches or other apps' windows.
+ * BentoBar's accessibility service. It reads SystemUI's status bar window (layout and text colour)
+ * and, of other windows, where they are and never what is in them; it draws BentoBar's items in
+ * overlay windows on top of the bar, and performs the global actions of the Tools menu when asked.
+ * It doesn't observe keys or touches.
  */
 class BarService : AccessibilityService() {
     private var bar: BarController? = null
