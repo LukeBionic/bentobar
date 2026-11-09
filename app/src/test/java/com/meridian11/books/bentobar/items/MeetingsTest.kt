@@ -65,4 +65,13 @@ class MeetingsTest {
         assertFalse("all-day", Meetings.isMeeting(allDay = true, editable = true, hasCallLink = true, hasOthers = true))
         assertFalse("a calendar you can't edit", Meetings.isMeeting(allDay = false, editable = false, hasCallLink = true, hasOthers = true))
     }
+
+    @Test fun anAllDayOrReadOnlyEventWithATaskLinkIsAskedAboutAttendeesSoItIsNotLostAsATask() {
+        assertTrue(Meetings.asksAttendees(hasCallLink = false, linksTask = true, allDay = true, editable = true))
+        assertTrue(Meetings.asksAttendees(hasCallLink = false, linksTask = true, allDay = false, editable = false))
+        assertTrue(Meetings.asksAttendees(hasCallLink = false, linksTask = false, allDay = false, editable = true))
+        // Plain all-day or read-only events stay unasked, and a call link needs no attendees.
+        assertFalse(Meetings.asksAttendees(hasCallLink = false, linksTask = false, allDay = true, editable = true))
+        assertFalse(Meetings.asksAttendees(hasCallLink = true, linksTask = true, allDay = false, editable = true))
+    }
 }

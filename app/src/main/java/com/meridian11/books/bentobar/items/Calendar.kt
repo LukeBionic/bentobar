@@ -155,7 +155,7 @@ object Calendar {
         // Without a call link, a meeting needs someone else invited. Attendees are read for every
         // loaded candidate, once per load (not per tick): Next meeting needs today's, and the calendar
         // leaves meetings out of its agenda on any day the month view can show.
-        val candidates = out.filter { it.link == null && !it.allDay && it.editable }.mapTo(HashSet()) { it.eventId }
+        val candidates = out.filter { Meetings.asksAttendees(it.link != null, it.eventId in taskLinked, it.allDay, it.editable) }.mapTo(HashSet()) { it.eventId }
         val withOthers = runCatching { withOthers(candidates, owners) }
             .onFailure { Log.w(TAG, "attendee query failed", it) }.getOrDefault(emptySet())
         // Tasks synced in from a task app (Todoist links each one, open or done) aren't events:

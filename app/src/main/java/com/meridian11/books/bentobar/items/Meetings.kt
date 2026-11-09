@@ -35,6 +35,14 @@ object Meetings {
         !allDay && editable && (hasCallLink || hasOthers)
 
     /**
+     * Whether an event's attendees are read: with no call link, a timed event on an editable calendar (it may be a
+     * meeting), or any event that [linksTask], so an all-day or read-only event with others invited isn't taken for a
+     * task ([isTask]). Plain tasks don't need it: they stay hidden.
+     */
+    fun asksAttendees(hasCallLink: Boolean, linksTask: Boolean, allDay: Boolean, editable: Boolean): Boolean =
+        !hasCallLink && (linksTask || (!allDay && editable))
+
+    /**
      * Whether an event that [linksTask] (a task app's link in its notes) is a task and so shows nowhere. A link alone
      * doesn't make one: a real meeting's notes can link a task. Only with no video-call link and nobody else invited.
      */
