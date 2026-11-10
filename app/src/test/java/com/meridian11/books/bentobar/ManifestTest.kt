@@ -95,6 +95,9 @@ class ManifestTest {
             assertTrue(section, s.all("exclude").any { it.getAttribute("domain") == "root" && it.getAttribute("path") == "no_backup" })
             // Nothing is named for inclusion, which would turn the rest of the rules into "only this".
             assertEquals(section, 0, s.all("include").size)
+            // A running timer and keep awake are this install's: restored elsewhere, a timer would ring on a device it was never set on.
+            val sharedPrefs = s.all("exclude").filter { it.getAttribute("domain") == "sharedpref" }.map { it.getAttribute("path") }.toSet()
+            assertEquals(section, setOf("timers.xml", "caffeine.xml"), sharedPrefs)
         }
     }
 
@@ -106,6 +109,28 @@ class ManifestTest {
         assertEquals(setOf(".ui.MainActivity", ".ui.BarMenuActivity", ".bar.BarService", ".tile.BarTile", ".tile.AwakeTile", ".tile.TimerTile",
             ".items.MediaAccess"), exported)
         for (service in application.all("service")) assertNotNull(service.attr("name"), service.attr("permission").takeIf { it.isNotEmpty() })
+    }
+
+    /**
+     * The same of what is built: a library can bring an exported activity or service along (ui-tooling's PreviewActivity
+     * once did, in debug), and src/main's manifest would not show it. An exported part is one marked so, or with an
+     * intent filter and no say either way.
+     */
+    @Test fun noLibraryBringsAnExportedPartAlong() {
+        val type = BuildConfig.BUILD_TYPE
+        val merged = xml("build/intermediates/merged_manifests/$type/process${type.replaceFirstChar { it.uppercase() }}Manifest/AndroidManifest.xml")
+        val app = merged.all("application").single()
+        val prefix = BuildConfig.APPLICATION_ID
+        val exported = (app.all("activity") + app.all("activity-alias") + app.all("service") + app.all("receiver") + app.all("provider"))
+            .filter { it.attr("exported") == "true" || (!it.hasAttributeNS(android, "exported") && it.all("intent-filter").isNotEmpty()) }
+            .map { it.attr("name").removePrefix(prefix) }.toSet()
+        // Debug builds add the adb test hooks from src/debug, guarded by the shell's DUMP permission; a release has none.
+        val hooks = if (type == "debug") setOf(".util.DebugReceiver", ".util.BarFlipActivity") else emptySet()
+        assertEquals(setOf(".ui.MainActivity", ".ui.BarMenuActivity", ".bar.BarService", ".tile.BarTile", ".tile.AwakeTile", ".tile.TimerTile",
+            ".items.MediaAccess", "androidx.profileinstaller.ProfileInstallReceiver") + hooks, exported)
+        // The one a library adds: AndroidX's profile installer, which only the shell (it holds DUMP) can start.
+        val installer = app.all("receiver").single { it.attr("name") == "androidx.profileinstaller.ProfileInstallReceiver" }
+        assertEquals("android.permission.DUMP", installer.attr("permission"))
     }
 
     // The accessibility service's own config (res/xml/accessibility_service.xml). AGENTS.md "Least privilege" and the Play
@@ -148,6 +173,15 @@ class ManifestTest {
         val meta = service.all("meta-data").single { it.attr("name") == "android.accessibilityservice" }
         assertEquals("@xml/accessibility_service", meta.attr("resource"))
         assertEquals(1, application.all("service").count { s -> s.all("action").any { it.attr("name") == "android.accessibilityservice.AccessibilityService" } })
+    }
+
+    @Test fun theServiceNeverActsOnAnotherAppsField() {
+        // What the disclosure and the Play declaration say: window positions, never window content. Paste into the focused
+        // field (1.7) needed the focused node of the app in front; none of this may come back without the words changing first.
+        val acts = listOf("ACTION_SET_TEXT", "ACTION_PASTE", "findFocus", "FOCUS_INPUT", "pasteOnClick", "performAction")
+        val offenders = File("src/main/java").walkTopDown().filter { it.isFile && it.extension == "kt" }
+            .filter { f -> acts.any { it in f.readText() } }.map { it.path }.toList()
+        assertEquals(emptyList<String>(), offenders)
     }
 
     @Test fun noCodeChangesTheServiceInfoAtRun() {

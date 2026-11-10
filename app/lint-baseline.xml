@@ -1,20 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <issues format="6" by="lint 9.4.1">
 
-    <!--
-      The one known error. FlightMenu.kt:114 calls menuOpens inside remember(), which must not return Unit: a real
-      defect (a side effect in composition), left for the next job, which fixes it and deletes this entry. Everything
-      else lint finds as an error is fixed or suppressed in code with its reason; warnings are not baselined.
-    -->
-    <issue
-        id="RememberReturnType"
-        message="`remember` calls must not return `Unit`"
-        errorLine1="    remember(item.id) { FlightItem.menuOpens(item.id) }"
-        errorLine2="    ~~~~~~~~">
-        <location
-            file="src/main/java/com/meridian11/books/bentobar/items/FlightMenu.kt"
-            line="114"
-            column="5"/>
-    </issue>
-
 </issues>
