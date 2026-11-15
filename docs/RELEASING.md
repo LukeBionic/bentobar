@@ -202,6 +202,11 @@ learned the hard way" says why. Run it again on every new draft.
   "Bluetooth"); a change of output within five seconds; a monitor on HDMI or USB-C; the volume agrees with Sound's.
 - **Connection.** "Sign in" behind a captive portal, a VPN, "No internet", "Offline", "Metered"; and no callback left
   behind once the item is gone (`dumpsys connectivity`).
+- **Network's addresses.** The menu's Addresses rows against Settings › Internet › the network's details: the IP
+  address, IPv6, the gateway, DNS, and Private DNS not in use, automatic and set to a host; a VPN (no gateway row);
+  a network with IPv6 resolvers. Wi-Fi off and on with the menu open takes the section away and brings it back. One
+  callback while a Network item is live, none once it is gone or the screen is off (`dumpsys connectivity`).
+  `network stage wifi|ethernet|vpn|ipv6|offline`, then `network off`.
 - **Screen time.** The glyph alone without Usage access; the time within about fifteen seconds of allowing it, close
   to Android's own figure; a closed lid and a restart are not counted; the menu lists the apps longest in front; it
   starts again at midnight.
