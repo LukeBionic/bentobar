@@ -1,30 +1,32 @@
 package com.meridian11.books.bentobar.items
 
 /**
- * The active network's link as the reader hands it over, every address as Android's text for it, so that the rules
- * below need no Android: "10.0.2.16", and IPv6 in its short form with a link-local one's zone behind it
- * ("fe80::1c2d:3e4f:5a6b:7c8d%wlan0"). [gateways]: those of its default routes. [dns]: its resolvers.
- * [privateDns]: Private DNS is on; [privateDnsHost]: the host it was set to, null in the automatic mode.
- */
-data class Link(
-    val addresses: List<String> = emptyList(),
-    val gateways: List<String> = emptyList(),
-    val dns: List<String> = emptyList(),
-    val privateDns: Boolean = false,
-    val privateDnsHost: String? = null,
-)
-
-/**
- * The Connection section of the Network menu: which rows a link gets and what each one says. Unit-tested
+ * The Addresses section of the Network menu: which rows a link gets and what each one says. Unit-tested
  * (`LinkRulesTest`).
  */
 object LinkRules {
+    /**
+     * The active network's link as the reader hands it over, every address as Android's text for it, so that the rules
+     * below need no Android: "10.0.2.16", and IPv6 in its short form with a link-local one's zone behind it
+     * ("fe80::1c2d:3e4f:5a6b:7c8d%wlan0"). [gateways]: those of its default routes. [dns]: its resolvers.
+     * [privateDns]: Private DNS is in use on this link (Android's `isPrivateDnsActive`: in the automatic mode it is not
+     * while the network's resolver can't do it); [privateDnsHost]: the host it was set to, null in the automatic mode.
+     * Nested here so that it is never taken for the Connection item's `ConnectionRules.Link`.
+     */
+    data class Link(
+        val addresses: List<String> = emptyList(),
+        val gateways: List<String> = emptyList(),
+        val dns: List<String> = emptyList(),
+        val privateDns: Boolean = false,
+        val privateDnsHost: String? = null,
+    )
+
     /** The rows, in the menu's order. */
     enum class Field { IPV4, IPV6, GATEWAY, DNS, PRIVATE_DNS }
 
     data class Row(val field: Field, val value: String)
 
-    /** The words from the resources: Private DNS's On and Off. */
+    /** The words from the resources: Private DNS's On, and what it says while it is not in use. */
     class Words(val on: String, val off: String)
 
     /** Between the parts of one value, as the menu's subtitle joins its words. */
@@ -34,13 +36,14 @@ object LinkRules {
      * The DNS row's value has room for this many characters beside its label: the widest pair seen to fit on the
      * card, an IPv4 resolver and a shortened IPv6 one. Two shortened IPv6 resolvers are 35, and the label broke into
      * a column of letters. A count of characters, not a measure of the text: a change to the card's width or to the
-     * row's type needs a new look at it (`./bento debug network stage wifi`, then `stage ipv6`).
+     * row's type needs a new look at it (`./bento debug network stage wifi`, then `stage ipv6` and `stage vpn`). The
+     * Private DNS row keeps to the same room.
      */
     private const val DNS_ROW = 30
 
     /**
      * The rows for [link]: none for no link, or one without an address yet, and the section is left out. Private DNS
-     * is a setting, not something a link can lack, so its row is there with any address.
+     * says whether this link's lookups are encrypted, so its row is there with any address.
      */
     fun rows(link: Link?, words: Words): List<Row> {
         if (link == null) return emptyList()
@@ -82,11 +85,32 @@ object LinkRules {
         return shown.joinToString(SEP).takeIf { it.length <= DNS_ROW } ?: shown.first()
     }
 
-    /** Private DNS as the row says it: Off, On (the automatic mode), or On with the host it was set to. */
-    fun privateDns(link: Link, words: Words): String = when {
-        !link.privateDns -> words.off
-        link.privateDnsHost.isNullOrBlank() -> words.on
-        else -> words.on + SEP + link.privateDnsHost
+    /**
+     * Private DNS as the row says it: not in use, On (the automatic mode), or On with the host it was set to, as
+     * much of it as the row has room for ([host]).
+     */
+    fun privateDns(link: Link, words: Words): String {
+        val host = link.privateDnsHost
+        return when {
+            !link.privateDns -> words.off
+            host.isNullOrBlank() -> words.on
+            else -> words.on + SEP + host(host, DNS_ROW - words.on.length - SEP.length)
+        }
+    }
+
+    /**
+     * A host name in [room] characters: whole where it fits, else its last labels behind "…"
+     * ("…cloudflare-dns.com"), so that the provider stays readable; a provider's host that names an account
+     * ("abc123.dns.nextdns.io") then also loses that part first. A last label longer than the room is cut to its end.
+     */
+    fun host(name: String, room: Int): String {
+        if (name.length <= room) return name
+        val labels = name.split('.')
+        for (from in 1 until labels.size) {
+            val tail = labels.drop(from).joinToString(".")
+            if (tail.length + 1 <= room) return "…$tail"
+        }
+        return "…" + name.takeLast((room - 1).coerceAtLeast(1))
     }
 
     /** An address without its zone ("%wlan0"). */

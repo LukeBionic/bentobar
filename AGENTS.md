@@ -99,7 +99,7 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
     One exception: `DisplaysItem`'s display listener also lives while "Keep awake while connected" is in force (an
     item has it on and the service is up, `DisplaysItem.follow`), sampled or not. That option is a
     promise about the screen staying on while the bar is hidden, so the bar hiding must not end it.
-    The Network menu's Connection section is `LinkWatch` (the active network's link from ConnectivityManager,
+    The Network menu's Addresses section is `LinkWatch` (the active network's link from ConnectivityManager,
     kept by a callback on the default network between `onLive()` and `onIdle()`) on the pure `LinkRules`; `LinkSamples` stages one.
   - `items/Refresher.kt` is `Calendar`'s way of loading as one class (a background thread, one load
     per key, an immutable snapshot, a generation counter); `items/Ask.kt` is the same for one
@@ -354,9 +354,10 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
 - `tools/readme_images.py`: composes docs/images/*.png (README) from raw captures in
   ~/.cache/bentobar/shots (see its docstring). Capture with a **demo layout** (`./bento debug cfg` to
   save the user's, `./bento debug import <base64>` to load the demo and later restore theirs) so no
-  calendar titles or other personal data show, and with `./bento winshot TITLE|app FILE`, which
-  saves a PNG of one of BentoBar's own windows (no pointer, no other apps; written to the debug
-  app's cache and pulled with run-as, since a broadcast result can't carry a big image).
+  calendar titles or other personal data show, with the network staged (`./bento debug network stage wifi`, then
+  `network off`) so the Network menu shows no real address (the same for a store screenshot of it), and with
+  `./bento winshot TITLE|app FILE`, which saves a PNG of one of BentoBar's own windows (no pointer, no other apps;
+  written to the debug app's cache and pulled with run-as, since a broadcast result can't carry a big image).
 - `docs/research/`: the device findings (probe results) and the official-docs research, with URLs.
 
 ## Before a PR
@@ -417,7 +418,7 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   `sound fixed on|off`; `notices stage three|many|progress|none|noaccess`; `live stage several`;
   `focus stage ready|running|endless|noaccess`; `sun stage evening|night|polar|nozone`; `progress stage
   morning|evening|yearend`; `breaks stage early|due`; `network stage wifi|ethernet|vpn|ipv6|offline` and `network off`
-  (the Connection section's rows; stage one before capturing the menu, so that no real address is in a picture). Each
+  (the Addresses section's rows; stage one before capturing the menu, so that no real address is in a picture). Each
   type's bare name prints what it knows (`media`, `devices`, `heat`, `flight`, `network`: which rows, never an address).
   For color tests a debug build has a window that lies under the bar and turns its icons dark or light
   on command, with no event of any kind: `adb shell am start -n com.meridian11.books.bentobar/.util.BarFlipActivity

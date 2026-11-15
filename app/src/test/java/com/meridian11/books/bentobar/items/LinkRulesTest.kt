@@ -1,6 +1,7 @@
 package com.meridian11.books.bentobar.items
 
 import com.meridian11.books.bentobar.items.LinkRules.Field
+import com.meridian11.books.bentobar.items.LinkRules.Link
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -9,12 +10,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The Connection section of the Network menu: which rows a link gets and what each one says, in the app's own words.
+ * The Addresses section of the Network menu: which rows a link gets and what each one says, in the app's own words.
  * Addresses are written as Android hands them over: IPv6 in its short form, a zone after "%", no prefix length.
  */
 class LinkRulesTest {
-    private val texts = StringFiles.read(listOf("strings.xml"))
-    private val words = LinkRules.Words(on = texts.strings.getValue("common_on"), off = texts.strings.getValue("common_off"))
+    private val texts = StringFiles.read(listOf("strings.xml", "strings_network.xml"))
+    private val words = LinkRules.Words(on = texts.strings.getValue("common_on"),
+        off = texts.strings.getValue("network_link_private_dns_unused"))
 
     private fun rows(link: Link?) = LinkRules.rows(link, words).map { it.field to it.value }
 
@@ -65,11 +67,28 @@ class LinkRulesTest {
         assertEquals("192.168.100.100", LinkRules.dns(listOf("192.168.100.100", "192.168.100.101")))
     }
 
-    @Test fun privateDnsReadsOffOnOrOnWithItsHost() {
+    @Test fun privateDnsReadsNotInUseOnOrOnWithItsHost() {
         val link = Link(addresses = listOf("10.0.0.2"))
-        assertTrue((Field.PRIVATE_DNS to "Off") in rows(link))
+        assertTrue((Field.PRIVATE_DNS to "Not in use") in rows(link))
         assertTrue((Field.PRIVATE_DNS to "On") in rows(link.copy(privateDns = true)))
         assertTrue((Field.PRIVATE_DNS to "On · dns.google") in rows(link.copy(privateDns = true, privateDnsHost = "dns.google")))
+    }
+
+    @Test fun aLongPrivateDnsHostKeepsItsLastLabelsWithinTheDnsRowsRoom() {
+        val on = Link(addresses = listOf("10.0.0.2"), privateDns = true)
+        // Cloudflare's own host for Android, 32 characters: whole, the label broke into a column of letters.
+        assertTrue((Field.PRIVATE_DNS to "On · …cloudflare-dns.com") in rows(on.copy(privateDnsHost = "1dot1dot1dot1.cloudflare-dns.com")))
+        // A host that names an account loses that part first.
+        assertEquals("…dns.nextdns.io", LinkRules.host("abc123def456.dns.nextdns.io", 20))
+        assertEquals("dns.google", LinkRules.host("dns.google", 25))
+        // A last label longer than the room is cut to its end.
+        assertEquals("…hijklmnopqrstuvwxyz", LinkRules.host("abcdefghijklmnopqrstuvwxyz", 20))
+        // Whatever the host, the row's value keeps to the DNS row's thirty characters.
+        val long = "a".repeat(63) + "." + "b".repeat(63) + "." + "c".repeat(63) + ".example"
+        for (host in listOf(long, "x".repeat(253), "1dot1dot1dot1.cloudflare-dns.com", "dns.adguard-dns.com")) {
+            val value = rows(on.copy(privateDnsHost = host)).single { it.first == Field.PRIVATE_DNS }.second
+            assertTrue("$value is ${value.length} characters", value.length <= 30)
+        }
     }
 
     @Test fun noLinkAndALinkWithoutAnAddressHaveNoRows() {
@@ -80,13 +99,13 @@ class LinkRulesTest {
     @Test fun theRowsComeInTheMenusOrder() {
         val wifi = LinkSamples.of("wifi")!!.link
         assertEquals(listOf(Field.IPV4, Field.IPV6, Field.GATEWAY, Field.DNS, Field.PRIVATE_DNS), rows(wifi).map { it.first })
-        assertEquals(listOf("192.168.1.42", "2001:db8:…:7f3e", "192.168.1.1", "192.168.1.1 · 2001:4860:…:8888", "Off"), rows(wifi).map { it.second })
+        assertEquals(listOf("192.168.1.42", "2001:db8:…:7f3e", "192.168.1.1", "192.168.1.1 · 2001:4860:…:8888", "Not in use"), rows(wifi).map { it.second })
     }
 
     @Test fun aTunnelHasNoGatewayRow() {
         val vpn = LinkSamples.of("vpn")!!.link
         assertEquals(listOf(Field.IPV4, Field.DNS, Field.PRIVATE_DNS), rows(vpn).map { it.first })
-        assertTrue((Field.PRIVATE_DNS to "On · dns.google") in rows(vpn))
+        assertTrue((Field.PRIVATE_DNS to "On · …cloudflare-dns.com") in rows(vpn))
     }
 
     @Test fun aNetworkWithIpv6AloneHasNoIpv4Row() {

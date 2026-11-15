@@ -6,9 +6,10 @@ import android.net.Network
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.meridian11.books.bentobar.items.LinkRules.Link
 
 /**
- * The active network's link (addresses, gateway, DNS, Private DNS) for the Network menu's Connection section, read
+ * The active network's link (addresses, gateway, DNS, Private DNS) for the Network menu's Addresses section, read
  * from ConnectivityManager. Read once when a Network item goes live, then kept by a callback on the default
  * network: nothing polls, and no callback exists while no such item is live. A test can stage a sample (debug
  * builds: `./bento debug network stage wifi`), shown instead of Android's until `network off`.
@@ -20,12 +21,24 @@ object LinkWatch {
     @Volatile private var staged: LinkSamples.Sample? = null
     /** The registered callback; null while nothing is followed. Main thread only. */
     private var callback: ConnectivityManager.NetworkCallback? = null
+    /** A Network item is live (between [live] and [idle]). Main thread only. */
+    private var following = false
 
-    /** The link as the menu shows it: the staged sample's, else Android's as last reported. */
+    /**
+     * The link as the menu shows it: the staged sample's, else Android's as last reported. Where the callback could not
+     * be registered, Android's is read each time instead, so a menu never shows a network that has gone.
+     */
     fun current(): Link? {
         val sample = staged
-        return if (sample != null) sample.link else link
+        if (sample != null) return sample.link
+        return if (following && callback == null) read() else link
     }
+
+    /** Android's link now; null for none, or where Android can't say. */
+    private fun read(): Link? = runCatching {
+        val cm = Env.app.getSystemService(ConnectivityManager::class.java)
+        cm?.activeNetwork?.let(cm::getLinkProperties)?.let(::of)
+    }.getOrNull()
 
     /**
      * A Network item is live: read the link now, then follow the default network. Read now because the callback's
@@ -34,10 +47,14 @@ object LinkWatch {
      */
     fun live() {
         if (callback != null) return
+        following = true
         val cm = Env.app.getSystemService(ConnectivityManager::class.java) ?: return
-        link = runCatching { cm.activeNetwork?.let(cm::getLinkProperties)?.let(::of) }.getOrNull()
+        link = read()
         val cb = object : ConnectivityManager.NetworkCallback() {
-            override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) { link = of(properties) }
+            // Android calls this on the main thread, where a throw would end the service: it must never throw.
+            override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) {
+                link = runCatching { of(properties) }.getOrNull()
+            }
             // Told only when no network takes the lost one's place: a change of networks comes as the new one's link.
             override fun onLost(network: Network) { link = null }
         }
@@ -50,6 +67,7 @@ object LinkWatch {
     /** No Network item is live any more: the link is forgotten, and the callback goes. Main thread. */
     fun idle() {
         // Before the return below: what live() read is forgotten even where the registration failed.
+        following = false
         link = null
         val cb = callback ?: return
         callback = null

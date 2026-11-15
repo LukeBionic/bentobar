@@ -62,7 +62,8 @@ object NetworkItem : ItemType("network", R.string.item_network_title, Sym.SWAP_V
             InfoRow(stringResource(R.string.network_received), Fmt.bytes(n.rxTotal.toDouble()))
             InfoRow(stringResource(R.string.network_sent), Fmt.bytes(n.txTotal.toDouble()))
             // The link's addresses and resolvers; nothing while there is no network, or none with an address yet.
-            val rows = LinkRules.rows(LinkWatch.current(), LinkRules.Words(stringResource(R.string.common_on), stringResource(R.string.common_off)))
+            val rows = LinkRules.rows(LinkWatch.current(),
+                LinkRules.Words(stringResource(R.string.common_on), stringResource(R.string.network_link_private_dns_unused)))
             if (rows.isNotEmpty()) {
                 MenuDivider()
                 SectionLabel(stringResource(R.string.network_link_title))
@@ -82,7 +83,7 @@ object NetworkItem : ItemType("network", R.string.item_network_title, Sym.SWAP_V
             item.opt("show", "both")) { set(item.with("show", it)) }
     }
 
-    /** A Connection row's label. No `else`: a new field doesn't compile until it has one. */
+    /** An Addresses row's label. No `else`: a new field doesn't compile until it has one. */
     private fun label(field: LinkRules.Field): Int = when (field) {
         LinkRules.Field.IPV4 -> R.string.network_link_ipv4
         LinkRules.Field.IPV6 -> R.string.network_link_ipv6
