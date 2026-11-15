@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.2.1 (2026-11-14)
+
+- **CPU reads the real load** (#53). A core's idle counters grow only when it wakes, so a core that slept through a
+  reading was counted as busy for it, and the reading it woke in, with more sleep than its own second, was clamped
+  at 0: a quiet device read several times its load (36% beside the system's Task Manager's 13%; 17.7% where `/proc/stat` said
+  2.0%). What a reading can't show is now owed to the next ones (`items/CpuLoad.kt`), so the readings add up to the
+  counters (3.8% there). The CPU item, its menu, its "Show when" rule and Heat's CPU row read it.
+- **Addresses in the Network menu** (#47). Under the totals: the IP address, the IPv6 address, the gateway, the DNS
+  servers and Private DNS of the default network (Off, On, or On and its host), shortened to fit a row. Read when the
+  menu opens and followed while a Network item is live; no new permission, nothing online, nothing of an address
+  logged. `./bento debug network stage …` stages one for pictures.
+- Kotlin 2.4.21, coroutines 1.11.0, kotlinx-serialization 1.12.0, Android Gradle Plugin 9.5.1, Gradle 9.9.0 (#55).
+
 ## 2.2.0 (2026-11-12)
 
 - **Shelf and Value from a URL are gone.** A layout that has one is read without it, and what they kept on the device

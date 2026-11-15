@@ -265,8 +265,9 @@ class NetSampler {
 /**
  * Device-wide CPU load. Apps can't read /proc/stat (Android 8+) and SystemHealthManager's CPU
  * headroom is unsupported on Googlebooks, but each core's idle-state residency in sysfs
- * (cpuN/cpuidle/stateM/time, microseconds) is readable: load = 1 − idle time / wall time.
- * Also reads each cluster's clock (cpufreq) and, on Qualcomm, the GPU's busy counter.
+ * (cpuN/cpuidle/stateM/time, microseconds) is readable: load = 1 − idle time / wall time, read as [CpuLoad] says
+ * (the counters move only when a core wakes). Also reads each cluster's clock (cpufreq) and, on Qualcomm, the GPU's
+ * busy counter.
  */
 class CpuSampler {
     private val root = java.io.File("/sys/devices/system/cpu")
@@ -275,14 +276,13 @@ class CpuSampler {
     private var idleFiles: Array<Array<java.io.RandomAccessFile>> = emptyArray()
     private var policies: List<Pair<String, java.io.File>> = emptyList()
     private var maxKhz: List<Long> = emptyList()
-    private var lastIdle = LongArray(0)
-    private var lastAt = 0L
+    private var load = CpuLoad(0)
     private var initialised = false
     private val buf = ByteArray(32)
     /** False when this device doesn't expose idle-state counters. */
     var available = true; private set
-    var total = 0.0; private set
-    var perCore = DoubleArray(0); private set
+    val total get() = load.total
+    val perCore: DoubleArray get() = load.perCore
     val history = History()
     val gpuHistory = History()
     /** GPU busy fraction, or null when the device doesn't expose it. */
@@ -318,6 +318,7 @@ class CpuSampler {
             }.toTypedArray()
         }
         available = idleFiles.isNotEmpty() && idleFiles.all { it.isNotEmpty() }
+        load = CpuLoad(cores.size)
         // Clock domains (policies) are fixed: find them once.
         policies = (0 until 32).mapNotNull { p ->
             val dir = java.io.File(root, "cpufreq/policy$p")
@@ -335,16 +336,7 @@ class CpuSampler {
         if (!available) return
         val t = android.os.SystemClock.elapsedRealtimeNanos() / 1000
         val idle = LongArray(cores.size) { i -> var sum = 0L; for (f in idleFiles[i]) sum += runCatching { readLong(f) }.getOrDefault(0L); sum }
-        if (lastAt > 0) {
-            val dt = (t - lastAt).toDouble()
-            if (dt in 200_000.0..10_000_000.0) {
-                perCore = DoubleArray(cores.size) { i -> (1 - (idle[i] - lastIdle[i]) / dt).coerceIn(0.0, 1.0) }
-                total = perCore.average()
-                history.add(total)
-            }
-        }
-        lastIdle = idle
-        lastAt = t
+        if (load.add(t, idle)) history.add(load.total)
         if (detail > 0) {
             clusters = policies.mapIndexed { i, (span, f) -> Cluster(span, readLong(f) ?: 0L, maxKhz[i]) }
             gpu = runCatching {
