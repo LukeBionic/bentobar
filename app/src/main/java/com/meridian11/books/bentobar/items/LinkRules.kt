@@ -1,8 +1,8 @@
 package com.meridian11.books.bentobar.items
 
 /**
- * The Addresses section of the Network menu: which rows a link gets and what each one says. Unit-tested
- * (`LinkRulesTest`).
+ * The Wi-Fi and Addresses sections of the Network menu, and its subtitle: which rows a link gets and what each one
+ * says. Unit-tested (`LinkRulesTest`).
  */
 object LinkRules {
     /**
@@ -21,13 +21,40 @@ object LinkRules {
         val privateDnsHost: String? = null,
     )
 
-    /** The rows, in the menu's order. */
-    enum class Field { IPV4, IPV6, GATEWAY, DNS, PRIVATE_DNS }
+    /** The rows, in the menu's order: the Wi-Fi section's, then the Addresses section's. */
+    enum class Field { LINK_SPEED, BAND, SIGNAL, IPV4, IPV6, GATEWAY, DNS, PRIVATE_DNS }
+
+    /**
+     * The Wi-Fi link as the reader hands it over, in plain numbers: the speed each way in Mbps, the frequency in MHz,
+     * and Android's signal level with the top of its scale ([wifi]). -1 is "not known": Android's own value for the
+     * speeds and the frequency, and the same here for the level and its scale.
+     */
+    data class Wifi(val rxMbps: Int, val txMbps: Int, val frequencyMhz: Int, val level: Int, val maxLevel: Int)
+
+    enum class Band { GHZ_2_4, GHZ_5, GHZ_6 }
+
+    enum class Signal { EXCELLENT, GOOD, FAIR, POOR }
 
     data class Row(val field: Field, val value: String)
 
     /** The words from the resources: Private DNS's On, and what it says while it is not in use. */
     class Words(val on: String, val off: String)
+
+    /**
+     * The Wi-Fi rows' text from the resources, each around its numbers so that the order of the words stays the
+     * resource's. Three for the speed, so that which one a link gets is decided here ([speed]) and not in the menu.
+     */
+    class WifiWords(
+        val both: (Int, Int) -> String,
+        val down: (Int) -> String,
+        val up: (Int) -> String,
+        val band: (Band) -> String,
+        val bandChannel: (String, Int) -> String,
+        val signal: (Signal) -> String,
+    )
+
+    /** Android's signal while it knows none (`WifiInfo.INVALID_RSSI`), in dBm. */
+    const val NO_SIGNAL = -127
 
     /** Between the parts of one value, as the menu's subtitle joins its words. */
     const val SEP = " · "
@@ -58,6 +85,87 @@ object LinkRules {
             Row(Field.PRIVATE_DNS, privateDns(link, words)),
         )
     }
+
+    /**
+     * The Wi-Fi link from what Android reports. The signal's level is Android's own reading of [rssi], on its own
+     * scale: [level] and [maxLevel] ask the Wi-Fi service for them. No signal is not asked about. Where either has
+     * no answer, the link has no level: its Signal row is left out and the other two stay.
+     */
+    fun wifi(rxMbps: Int, txMbps: Int, frequencyMhz: Int, rssi: Int, level: (Int) -> Int?, maxLevel: () -> Int?): Wifi {
+        val unknown = Wifi(rxMbps, txMbps, frequencyMhz, -1, -1)
+        if (rssi == NO_SIGNAL) return unknown
+        val known = level(rssi) ?: return unknown
+        val top = maxLevel() ?: return unknown
+        return unknown.copy(level = known, maxLevel = top)
+    }
+
+    /**
+     * The Wi-Fi rows for [wifi]: none for no Wi-Fi link, and the section is left out. A row whose value Android does
+     * not know is left out too.
+     */
+    fun wifiRows(wifi: Wifi?, words: WifiWords): List<Row> {
+        if (wifi == null) return emptyList()
+        val band = band(wifi.frequencyMhz)
+        val channel = channel(wifi.frequencyMhz)
+        return listOfNotNull(
+            speed(wifi.rxMbps, wifi.txMbps, words)?.let { Row(Field.LINK_SPEED, it) },
+            if (band != null && channel != null) Row(Field.BAND, words.bandChannel(words.band(band), channel)) else null,
+            signal(wifi.level, wifi.maxLevel)?.let { Row(Field.SIGNAL, words.signal(it)) },
+        )
+    }
+
+    /** The link's speed down and up on one row; a direction of 0 or less is not known and is left out; null for neither. */
+    fun speed(rxMbps: Int, txMbps: Int, words: WifiWords): String? = when {
+        rxMbps > 0 && txMbps > 0 -> words.both(rxMbps, txMbps)
+        rxMbps > 0 -> words.down(rxMbps)
+        txMbps > 0 -> words.up(txMbps)
+        else -> null
+    }
+
+    /**
+     * The band a frequency is in, by the ranges Android's `ScanResult` gives them; null outside the three. 5935 MHz
+     * is the 6 GHz band's own, below its other channels.
+     */
+    fun band(frequencyMhz: Int): Band? = when (frequencyMhz) {
+        in 2412..2484 -> Band.GHZ_2_4
+        in 5160..5885 -> Band.GHZ_5
+        5935, in 5955..7115 -> Band.GHZ_6
+        else -> null
+    }
+
+    /**
+     * The channel's number within its band; null exactly where [band] is. A band's channels are 5 MHz apart, but for
+     * two that stand off the steps: 2484 MHz is 14, and 5935 MHz is 2.
+     */
+    fun channel(frequencyMhz: Int): Int? = when (band(frequencyMhz)) {
+        Band.GHZ_2_4 -> if (frequencyMhz == 2484) 14 else (frequencyMhz - 2407) / 5
+        Band.GHZ_5 -> (frequencyMhz - 5000) / 5
+        Band.GHZ_6 -> if (frequencyMhz == 5935) 2 else (frequencyMhz - 5950) / 5
+        null -> null
+    }
+
+    /**
+     * The signal as a word, by the level's share of Android's scale, whose top differs between devices: the top is
+     * Excellent, three quarters and more Good, half and more Fair. On the usual scale of 0 to 4 these are the words
+     * Android's Settings show for 4, 3 and 2. Null for no level, or a scale without a top.
+     */
+    fun signal(level: Int, maxLevel: Int): Signal? {
+        if (level < 0 || maxLevel <= 0) return null
+        val share = level.toDouble() / maxLevel
+        return when {
+            share >= 1 -> Signal.EXCELLENT
+            share >= 0.75 -> Signal.GOOD
+            share >= 0.5 -> Signal.FAIR
+            else -> Signal.POOR
+        }
+    }
+
+    /**
+     * The menu's subtitle: the network's kind, the Wi-Fi band behind it, then VPN and metered where they apply.
+     * Only Wi-Fi has a band ([onWifi]), whatever is handed over.
+     */
+    fun subtitle(kind: String, onWifi: Boolean, band: String?, vpn: String?, metered: String?): String =
+        listOfNotNull(kind, band.takeIf { onWifi }, vpn, metered).joinToString(SEP)
 
     /** The first IPv4 address. */
     fun ipv4(addresses: List<String>): String? = addresses.firstOrNull { ':' !in it }
@@ -129,13 +237,17 @@ object LinkRules {
         return "${groups[0]}:${groups[1]}:…:${groups.last()}"
     }
 
-    /** A line for the debug hook: which rows the link has, and never an address or a host. */
-    fun present(link: Link?): String {
-        if (link == null) return "no link"
-        return rows(link, Words("", "")).joinToString(" ") {
+    /** A line for the debug hook: which rows the Wi-Fi link and the link have, and never a value, an address or a host. */
+    fun present(link: Link?, wifi: Wifi?): String {
+        val wifiRows = wifiRows(wifi, NO_WORDS).map { it.field.name.lowercase() }
+        val linkRows = if (link == null) "no link" else rows(link, Words("", "")).joinToString(" ") {
             if (it.field == Field.PRIVATE_DNS) "private_dns=" + (if (link.privateDns) "on" else "off") else it.field.name.lowercase()
         }.ifEmpty { "no address" }
+        return (wifiRows + linkRows).joinToString(" ")
     }
+
+    /** For [present], which asks which Wi-Fi rows there are and not what they say. */
+    private val NO_WORDS = WifiWords({ _, _ -> "" }, { "" }, { "" }, { "" }, { _, _ -> "" }, { "" })
 
     /** How the text of a link-local address (fe80::/10, so fe80 to febf) starts. */
     private val LINK_LOCAL = setOf("fe8", "fe9", "fea", "feb")
