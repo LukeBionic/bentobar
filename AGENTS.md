@@ -593,8 +593,13 @@ Name no other company's app as a model or a comparison, in the app or anywhere h
   `SystemHealthManager.getCpuHeadroom()` throws UnsupportedOperationException here. Readable:
   `/sys/devices/system/cpu/cpuN/cpuidle/stateM/time` (idle residency, µs), cpufreq
   `scaling_cur_freq`, and `/sys/class/kgsl/kgsl-3d0/gpubusy` (Adreno). Load = 1 − Δidle/Δwall per
-  core; it matched `top` within ~1 point under load (reads a few points high at idle).
-  `./bento debug cpuprobe` checks what's readable on a new device.
+  core; it matched `top` within ~1 point under load. **The idle counters move only when a core wakes:** a core
+  asleep through a reading reads busy, and its whole sleep lands in the reading it wakes in. Up to 2.2 each reading
+  was clamped to 0..1 on its own, which kept the busy readings and threw the surplus away, so a quiet device read
+  several times its load (#53: 36% beside Task Manager's 13%; on a 12-core Googlebook 17.7% where `/proc/stat` said
+  2.0%). `items/CpuLoad.kt` (pure, `CpuLoadTest`) owes what a reading could not show to the next ones (at most 5 s
+  of it), so the readings add up to the counters (3.8% there). No app may read `/proc/stat` or the cgroups'
+  `cpu.stat`, so the counters are all there is. `./bento debug cpuprobe` checks what's readable on a new device.
 - **CPU cost:** measure release builds after `cmd package compile -m speed -f` (adb installs are
   only verified, so JIT dominates at first). The big costs were full node-tree scans on every
   window event (title changes included) and sampling folded items; now ~0.5% of one core with CPU
