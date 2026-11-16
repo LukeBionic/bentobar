@@ -13,6 +13,8 @@
     <string name="network_wifi_band_24">2.4 GHz</string>
     <string name="network_wifi_band_5">5 GHz</string>
     <string name="network_wifi_band_6">6 GHz</string>
+    <!-- The subtitle of a connection on two bands at once: both names. -->
+    <string name="network_wifi_bands">%1$s + %2$s</string>
     <!-- The Signal row: Android's own level as a word, the words its Settings use. -->
     <string name="network_wifi_signal_excellent">Excellent</string>
     <string name="network_wifi_signal_good">Good</string>

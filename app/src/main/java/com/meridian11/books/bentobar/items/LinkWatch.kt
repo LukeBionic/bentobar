@@ -14,17 +14,15 @@ import com.meridian11.books.bentobar.items.LinkRules.Wifi
 
 /**
  * The active network's link (addresses, gateway, DNS, Private DNS) for the Network menu's Addresses section, and its
- * Wi-Fi link (speed, frequency, signal) for the Wi-Fi section, read from ConnectivityManager. Read once when a
- * Network item goes live, then kept by a callback on the default network: nothing polls, and no callback exists
- * while no such item is live. The signal's level is the Wi-Fi service's to give, and is asked for whenever the Wi-Fi
- * link is read: with each report of the callback, so not with each draw of the menu while there is one. A test can
- * stage a sample (debug builds: `./bento debug network stage wifi`), shown instead of Android's until `network off`.
+ * Wi-Fi link (speed, frequency, signal) for the Wi-Fi section, read from ConnectivityManager. The link is read once
+ * when a Network item goes live, then kept by a callback on the default network: nothing polls, and no callback
+ * exists while no such item is live. The Wi-Fi link is not kept: Android reports a change to it every few seconds,
+ * and the menu is mostly closed. It is read when the menu draws, as the subtitle is. A test can stage a sample
+ * (debug builds: `./bento debug network stage wifi`), shown instead of Android's until `network off`.
  */
 object LinkWatch {
     /** Android's link as last reported; null: no network, or no Network item is live. Written on the main thread only. */
     @Volatile private var link: Link? = null
-    /** Android's Wi-Fi link as last reported; null: the network is not Wi-Fi, or what [link] is null for. Main thread only. */
-    @Volatile private var wifi: Wifi? = null
     /** What the test hook staged, shown instead of Android's until `network off`; null: nothing staged. */
     @Volatile private var staged: LinkSamples.Sample? = null
     /** The registered callback; null while nothing is followed. Main thread only. */
@@ -43,13 +41,14 @@ object LinkWatch {
     }
 
     /**
-     * The Wi-Fi link as the menu shows it, by the rule of [current]. A staged sample's is shown as it is, none too: a
-     * staged Ethernet has no Wi-Fi rows, whatever the device is on.
+     * The Wi-Fi link as the menu shows it: the staged sample's, else Android's, read now; null while no Network item
+     * is live, as [current] is. A staged sample's is shown as it is, none too: a staged Ethernet has no Wi-Fi rows,
+     * whatever the device is on.
      */
     fun currentWifi(): Wifi? {
         val sample = staged
         if (sample != null) return sample.wifi
-        return if (following && callback == null) readWifi() else wifi
+        return if (following) readWifi() else null
     }
 
     /** Android's link now; null for none, or where Android can't say. */
@@ -74,18 +73,13 @@ object LinkWatch {
         following = true
         val cm = Env.app.getSystemService(ConnectivityManager::class.java) ?: return
         link = read()
-        wifi = readWifi()
         val cb = object : ConnectivityManager.NetworkCallback() {
             // Android calls this on the main thread, where a throw would end the service: it must never throw.
             override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) {
                 link = runCatching { of(properties) }.getOrNull()
             }
             // Told only when no network takes the lost one's place: a change of networks comes as the new one's link.
-            override fun onLost(network: Network) { link = null; wifi = null }
-            // On the main thread too, so it must never throw either. Under a VPN the report is the tunnel's and has no WifiInfo.
-            override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
-                wifi = runCatching { wifiOf(capabilities) }.getOrNull()
-            }
+            override fun onLost(network: Network) { link = null }
         }
         // On the main thread, as live() and idle() are: Android's own callback thread could write after idle() forgot the link.
         runCatching { cm.registerDefaultNetworkCallback(cb, Handler(Looper.getMainLooper())) }
@@ -98,7 +92,6 @@ object LinkWatch {
         // Before the return below: what live() read is forgotten even where the registration failed.
         following = false
         link = null
-        wifi = null
         val cb = callback ?: return
         callback = null
         runCatching { Env.app.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(cb) }
@@ -118,14 +111,16 @@ object LinkWatch {
     )
 
     /**
-     * Android's Wi-Fi link as the rules take it; null for a network that is not Wi-Fi. The callback asks for no
-     * location, so the WifiInfo is Android's copy without the network's name; the speeds, the frequency and the
-     * signal are in it all the same. A Wi-Fi service that is missing or throws has no answer about the level, which
-     * costs the Signal row alone ([LinkRules.wifi]).
+     * Android's Wi-Fi link as the rules take it; null for a network that is not Wi-Fi, which a tunnel over Wi-Fi is
+     * too. The app has no location permission, so the WifiInfo is Android's copy without the network's name; the
+     * speeds, the frequency and the signal are in it all the same. A Wi-Fi service that is missing or throws has no
+     * answer about the level, which costs the Signal row alone ([LinkRules.wifi]).
      */
     private fun wifiOf(capabilities: NetworkCapabilities): Wifi? {
         val info = capabilities.transportInfo as? WifiInfo ?: return null
-        return LinkRules.wifi(info.rxLinkSpeedMbps, info.txLinkSpeedMbps, info.frequency, info.rssi,
+        // The links this device is on, not every one the access point has.
+        val links = info.associatedMloLinks.mapNotNull { LinkRules.radio(it.band, it.channel) }
+        return LinkRules.wifi(info.rxLinkSpeedMbps, info.txLinkSpeedMbps, info.frequency, info.rssi, links,
             level = { rssi -> runCatching { wifiService()?.calculateSignalLevel(rssi) }.getOrNull() },
             maxLevel = { runCatching { wifiService()?.maxSignalLevel }.getOrNull() })
     }
@@ -133,7 +128,7 @@ object LinkWatch {
     private fun wifiService(): WifiManager? = Env.app.getSystemService(WifiManager::class.java)
 
     /**
-     * The test hook (debug builds): `stage wifi|ethernet|vpn|ipv6|weak|offline` shows a sample's rows, `off` ends it.
+     * The test hook (debug builds): `stage wifi|ethernet|vpn|ipv6|weak|mlo|offline` shows a sample's rows, `off` ends it.
      * Without a word: which rows the menu has now, and never a value or an address.
      */
     fun debug(args: List<String>): String? {

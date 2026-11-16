@@ -27,9 +27,17 @@ object LinkRules {
     /**
      * The Wi-Fi link as the reader hands it over, in plain numbers: the speed each way in Mbps, the frequency in MHz,
      * and Android's signal level with the top of its scale ([wifi]). -1 is "not known": Android's own value for the
-     * speeds and the frequency, and the same here for the level and its scale.
+     * speeds and the frequency, and the same here for the level and its scale. [links]: the links of a connection that
+     * runs on several at once (Wi-Fi 7's multi-link operation), and empty for any other. With several, Android's
+     * speeds, frequency and signal are those of the link with the strongest signal.
      */
-    data class Wifi(val rxMbps: Int, val txMbps: Int, val frequencyMhz: Int, val level: Int, val maxLevel: Int)
+    data class Wifi(
+        val rxMbps: Int, val txMbps: Int, val frequencyMhz: Int, val level: Int, val maxLevel: Int,
+        val links: List<Radio> = emptyList(),
+    )
+
+    /** Where one link is: its band, and its channel's number within it. */
+    data class Radio(val band: Band, val channel: Int)
 
     enum class Band { GHZ_2_4, GHZ_5, GHZ_6 }
 
@@ -50,6 +58,7 @@ object LinkRules {
         val up: (Int) -> String,
         val band: (Band) -> String,
         val bandChannel: (String, Int) -> String,
+        val bands: (String, String) -> String,
         val signal: (Signal) -> String,
     )
 
@@ -89,10 +98,13 @@ object LinkRules {
     /**
      * The Wi-Fi link from what Android reports. The signal's level is Android's own reading of [rssi], on its own
      * scale: [level] and [maxLevel] ask the Wi-Fi service for them. No signal is not asked about. Where either has
-     * no answer, the link has no level: its Signal row is left out and the other two stay.
+     * no answer, the link has no level: its Signal row is left out and the others stay.
      */
-    fun wifi(rxMbps: Int, txMbps: Int, frequencyMhz: Int, rssi: Int, level: (Int) -> Int?, maxLevel: () -> Int?): Wifi {
-        val unknown = Wifi(rxMbps, txMbps, frequencyMhz, -1, -1)
+    fun wifi(
+        rxMbps: Int, txMbps: Int, frequencyMhz: Int, rssi: Int, links: List<Radio> = emptyList(),
+        level: (Int) -> Int?, maxLevel: () -> Int?,
+    ): Wifi {
+        val unknown = Wifi(rxMbps, txMbps, frequencyMhz, -1, -1, links)
         if (rssi == NO_SIGNAL) return unknown
         val known = level(rssi) ?: return unknown
         val top = maxLevel() ?: return unknown
@@ -101,17 +113,43 @@ object LinkRules {
 
     /**
      * The Wi-Fi rows for [wifi]: none for no Wi-Fi link, and the section is left out. A row whose value Android does
-     * not know is left out too.
+     * not know is left out too. A connection on several links has a Band row for each ([radios]).
      */
     fun wifiRows(wifi: Wifi?, words: WifiWords): List<Row> {
         if (wifi == null) return emptyList()
-        val band = band(wifi.frequencyMhz)
-        val channel = channel(wifi.frequencyMhz)
-        return listOfNotNull(
-            speed(wifi.rxMbps, wifi.txMbps, words)?.let { Row(Field.LINK_SPEED, it) },
-            if (band != null && channel != null) Row(Field.BAND, words.bandChannel(words.band(band), channel)) else null,
-            signal(wifi.level, wifi.maxLevel)?.let { Row(Field.SIGNAL, words.signal(it)) },
-        )
+        return listOfNotNull(speed(wifi.rxMbps, wifi.txMbps, words)?.let { Row(Field.LINK_SPEED, it) }) +
+            radios(wifi).map { Row(Field.BAND, words.bandChannel(words.band(it.band), it.channel)) } +
+            listOfNotNull(signal(wifi.level, wifi.maxLevel)?.let { Row(Field.SIGNAL, words.signal(it)) })
+    }
+
+    /**
+     * Where the Wi-Fi link is: the band and channel of its frequency, and none for a frequency outside the bands. A
+     * connection on several links at once has one for each link, the lower band first, whatever Android's order.
+     * One link listed alone says no more than the frequency does, so the frequency is read.
+     */
+    fun radios(wifi: Wifi): List<Radio> {
+        if (wifi.links.size > 1) return wifi.links.distinct().sortedWith(compareBy({ it.band }, { it.channel }))
+        val band = band(wifi.frequencyMhz) ?: return emptyList()
+        val channel = channel(wifi.frequencyMhz) ?: return emptyList()
+        return listOf(Radio(band, channel))
+    }
+
+    /** The subtitle's band: each band the link is on, once and the lower first ("5 GHz + 6 GHz"); null where none is known. */
+    fun bands(wifi: Wifi?, words: WifiWords): String? =
+        wifi?.let(::radios)?.map { it.band }?.distinct()?.map(words.band)?.reduceOrNull(words.bands)
+
+    /**
+     * One link of a multi-link connection from Android's numbers for it: the band as `ScanResult.WIFI_BAND_*` has
+     * it (1, 2 and 8 for the three bands) and the channel. Null for another band, or for a link without a channel.
+     */
+    fun radio(band: Int, channel: Int): Radio? {
+        val known = when (band) {
+            1 -> Band.GHZ_2_4
+            2 -> Band.GHZ_5
+            8 -> Band.GHZ_6
+            else -> return null
+        }
+        return if (channel > 0) Radio(known, channel) else null
     }
 
     /** The link's speed down and up on one row; a direction of 0 or less is not known and is left out; null for neither. */
@@ -247,7 +285,7 @@ object LinkRules {
     }
 
     /** For [present], which asks which Wi-Fi rows there are and not what they say. */
-    private val NO_WORDS = WifiWords({ _, _ -> "" }, { "" }, { "" }, { "" }, { _, _ -> "" }, { "" })
+    private val NO_WORDS = WifiWords({ _, _ -> "" }, { "" }, { "" }, { "" }, { _, _ -> "" }, { _, _ -> "" }, { "" })
 
     /** How the text of a link-local address (fe80::/10, so fe80 to febf) starts. */
     private val LINK_LOCAL = setOf("fe8", "fe9", "fea", "feb")

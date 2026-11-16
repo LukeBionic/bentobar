@@ -57,7 +57,7 @@ object NetworkItem : ItemType("network", R.string.item_network_title, Sym.SWAP_V
         val n = Env.net
         // One reading for a draw, so that the subtitle's band and the Band row can't differ.
         val wifi = LinkWatch.currentWifi()
-        val band = wifi?.let { LinkRules.band(it.frequencyMhz) }?.let(wifiWords.band)
+        val band = LinkRules.bands(wifi, wifiWords)
         MenuCard(Sym.SWAP_VERT, stringResource(R.string.network_menu_title), Env.net.describe(Env.app, band)) {
             InfoRow(stringResource(R.string.network_download), "${Fmt.bytes(n.down)}/s", MaterialTheme.colorScheme.primary)
             InfoRow(stringResource(R.string.network_upload), "${Fmt.bytes(n.up)}/s", MaterialTheme.colorScheme.tertiary)
@@ -111,6 +111,7 @@ object NetworkItem : ItemType("network", R.string.item_network_title, Sym.SWAP_V
         up = { Env.str(R.string.network_wifi_speed_up, it) },
         band = { Env.str(name(it)) },
         bandChannel = { band, channel -> Env.str(R.string.network_wifi_band_channel, band, channel) },
+        bands = { first, next -> Env.str(R.string.network_wifi_bands, first, next) },
         signal = { Env.str(name(it)) },
     )
 

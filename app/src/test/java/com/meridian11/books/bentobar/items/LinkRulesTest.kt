@@ -3,6 +3,7 @@ package com.meridian11.books.bentobar.items
 import com.meridian11.books.bentobar.items.LinkRules.Band
 import com.meridian11.books.bentobar.items.LinkRules.Field
 import com.meridian11.books.bentobar.items.LinkRules.Link
+import com.meridian11.books.bentobar.items.LinkRules.Radio
 import com.meridian11.books.bentobar.items.LinkRules.Signal
 import com.meridian11.books.bentobar.items.LinkRules.Wifi
 import org.junit.Assert.assertEquals
@@ -29,6 +30,7 @@ class LinkRulesTest {
         up = { text("network_wifi_speed_up", it) },
         band = { text(when (it) { Band.GHZ_2_4 -> "network_wifi_band_24"; Band.GHZ_5 -> "network_wifi_band_5"; Band.GHZ_6 -> "network_wifi_band_6" }) },
         bandChannel = { band, channel -> text("network_wifi_band_channel", band, channel) },
+        bands = { first, next -> text("network_wifi_bands", first, next) },
         signal = { text("network_wifi_signal_" + it.name.lowercase()) },
     )
 
@@ -138,7 +140,7 @@ class LinkRulesTest {
         assertNotNull(LinkSamples.of("ethernet")!!.link)
         assertNull(LinkSamples.of("moon"))
         // The samples on Wi-Fi have its values, and no other has.
-        assertEquals(listOf("wifi", "ipv6", "weak"), LinkSamples.names.filter { LinkSamples.of(it)!!.wifi != null })
+        assertEquals(listOf("wifi", "ipv6", "weak", "mlo"), LinkSamples.names.filter { LinkSamples.of(it)!!.wifi != null })
     }
 
     @Test fun eachWifiSampleShowsItsLook() {
@@ -147,6 +149,8 @@ class LinkRulesTest {
         assertEquals(listOf("5764 down · 5764 up Mbps", "6 GHz · channel 233", "Excellent"), values("ipv6"))
         // One direction unknown, and the lowest word.
         assertEquals(listOf("72 down Mbps", "2.4 GHz · channel 11", "Poor"), values("weak"))
+        // Two links at once, and a Band row for each.
+        assertEquals(listOf("2882 down · 2594 up Mbps", "5 GHz · channel 44", "6 GHz · channel 37", "Excellent"), values("mlo"))
     }
 
     @Test fun everySamplesWifiValuesFitTheRow() {
@@ -160,6 +164,7 @@ class LinkRulesTest {
         fun line(name: String) = LinkSamples.of(name)!!.let { LinkRules.present(it.link, it.wifi) }
         assertEquals("link_speed band signal ipv4 ipv6 gateway dns private_dns=off", line("wifi"))
         assertEquals("link_speed band signal ipv4 gateway dns private_dns=off", line("weak"))
+        assertEquals("link_speed band band signal ipv4 gateway dns private_dns=off", line("mlo"))
         assertEquals("link_speed band signal ipv6 gateway dns private_dns=on", line("ipv6"))
         assertEquals("ipv4 dns private_dns=on", line("vpn"))
         assertEquals("no link", LinkRules.present(null, null))
@@ -231,6 +236,50 @@ class LinkRulesTest {
     @Test fun theWifiRowsComeInTheMenusOrder() {
         assertEquals(listOf(Field.LINK_SPEED to "866 down · 780 up Mbps", Field.BAND to "5 GHz · channel 44", Field.SIGNAL to "Good"),
             wifiRows(Wifi(866, 780, 5220, 3, 4)))
+    }
+
+    @Test fun aLinkOnTwoBandsHasABandRowForEach() {
+        // Whatever order Android lists them in, the lower band comes first.
+        val both = Wifi(2882, 2594, 6135, 4, 4, links = listOf(Radio(Band.GHZ_6, 37), Radio(Band.GHZ_5, 44)))
+        assertEquals(listOf(Field.LINK_SPEED to "2882 down · 2594 up Mbps", Field.BAND to "5 GHz · channel 44",
+            Field.BAND to "6 GHz · channel 37", Field.SIGNAL to "Excellent"), wifiRows(both))
+        // Two links in one band are two rows too.
+        val oneBand = Wifi(-1, -1, 5745, -1, -1, links = listOf(Radio(Band.GHZ_5, 149), Radio(Band.GHZ_5, 36)))
+        assertEquals(listOf(Field.BAND to "5 GHz · channel 36", Field.BAND to "5 GHz · channel 149"), wifiRows(oneBand))
+    }
+
+    @Test fun oneLinkAloneReadsAsTheFrequency() {
+        // An access point that can do several links, with one in use: the row is the frequency's, as on any Wi-Fi.
+        val one = Wifi(866, 780, 5220, 3, 4, links = listOf(Radio(Band.GHZ_5, 44)))
+        assertEquals(wifiRows(Wifi(866, 780, 5220, 3, 4)), wifiRows(one))
+        assertEquals("5 GHz", LinkRules.bands(one, wifiWords))
+    }
+
+    @Test fun theSubtitleNamesEachBandOfTheLinkOnce() {
+        fun bands(vararg links: Radio) = LinkRules.bands(Wifi(-1, -1, 6135, -1, -1, links.toList()), wifiWords)
+        assertEquals("5 GHz + 6 GHz", bands(Radio(Band.GHZ_6, 37), Radio(Band.GHZ_5, 44)))
+        assertEquals("2.4 GHz + 5 GHz + 6 GHz", bands(Radio(Band.GHZ_6, 37), Radio(Band.GHZ_2_4, 6), Radio(Band.GHZ_5, 44)))
+        assertEquals("5 GHz", bands(Radio(Band.GHZ_5, 149), Radio(Band.GHZ_5, 36)))
+        // No links listed: the frequency's band, and none for a frequency outside the three.
+        assertEquals("6 GHz", bands())
+        assertNull(LinkRules.bands(Wifi(-1, -1, -1, -1, -1), wifiWords))
+        assertNull(LinkRules.bands(null, wifiWords))
+    }
+
+    @Test fun androidsBandNumbersAreTheThreeBands() {
+        assertEquals(Radio(Band.GHZ_2_4, 6), LinkRules.radio(1, 6))
+        assertEquals(Radio(Band.GHZ_5, 44), LinkRules.radio(2, 44))
+        assertEquals(Radio(Band.GHZ_6, 37), LinkRules.radio(8, 37))
+        // 60 GHz, no band, and a link without a channel yet.
+        assertNull(LinkRules.radio(16, 2))
+        assertNull(LinkRules.radio(0, 1))
+        assertNull(LinkRules.radio(2, 0))
+    }
+
+    @Test fun theLinksComeThroughWithTheSignalOrWithout() {
+        val links = listOf(Radio(Band.GHZ_5, 44), Radio(Band.GHZ_6, 37))
+        assertEquals(Wifi(2882, 2594, 6135, 4, 4, links), LinkRules.wifi(2882, 2594, 6135, -48, links, level = { 4 }, maxLevel = { 4 }))
+        assertEquals(Wifi(2882, 2594, 6135, -1, -1, links), LinkRules.wifi(2882, 2594, 6135, -48, links, level = { null }, maxLevel = { 4 }))
     }
 
     @Test fun noWifiHasNoWifiRows() {

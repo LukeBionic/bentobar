@@ -1,6 +1,8 @@
 package com.meridian11.books.bentobar.items
 
+import com.meridian11.books.bentobar.items.LinkRules.Band
 import com.meridian11.books.bentobar.items.LinkRules.Link
+import com.meridian11.books.bentobar.items.LinkRules.Radio
 import com.meridian11.books.bentobar.items.LinkRules.Wifi
 
 /**
@@ -9,7 +11,7 @@ import com.meridian11.books.bentobar.items.LinkRules.Wifi
  * none is any device's, and neither are the Wi-Fi values. Pure, so a unit test checks each one's rows.
  */
 object LinkSamples {
-    val names = listOf("wifi", "ethernet", "vpn", "ipv6", "weak", "offline")
+    val names = listOf("wifi", "ethernet", "vpn", "ipv6", "weak", "mlo", "offline")
 
     /** [link]: what is shown instead of the real one; null is no network. [wifi]: its Wi-Fi link; null where it is not Wi-Fi. */
     class Sample(val name: String, val link: Link?, val wifi: Wifi? = null)
@@ -50,6 +52,13 @@ object LinkSamples {
             gateways = listOf("192.168.0.1"),
             dns = listOf("192.168.0.1"),
         ), Wifi(rxMbps = 72, txMbps = -1, frequencyMhz = 2462, level = 1, maxLevel = 4))
+        // A Wi-Fi 7 connection on two links at once, one in the 5 GHz band and one in the 6 GHz band.
+        "mlo" -> Sample(name, Link(
+            addresses = listOf("192.168.68.31"),
+            gateways = listOf("192.168.68.1"),
+            dns = listOf("192.168.68.1"),
+        ), Wifi(rxMbps = 2882, txMbps = 2594, frequencyMhz = 6135, level = 4, maxLevel = 4,
+            links = listOf(Radio(Band.GHZ_5, 44), Radio(Band.GHZ_6, 37))))
         "offline" -> Sample(name, null)
         else -> null
     }
